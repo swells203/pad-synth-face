@@ -1,0 +1,7 @@
+[tool.uv.workspace]
+members = ["pad-synth-core", "pad-synth-face"]
+
+[tool.pytest.ini_options]
+testpaths = ["pad-synth-core/tests", "pad-synth-face/tests", "tests"]
+python_files = ["test_*.py"]
+addopts = "-ra --import-mode=importlib"
