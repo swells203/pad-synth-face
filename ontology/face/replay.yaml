@@ -1,6 +1,8 @@
 version: "2026-05-11"
 attack_type: replay
 axes:
+  # informational only — recorded in attack_params but not consumed by Phase 1 simulate()
+  # (Phase 1 uses a single column-stripe subpixel model regardless of device class.)
   device_class:
     type: categorical
     values: [phone_oled, phone_lcd, tablet, laptop, desktop_monitor]
