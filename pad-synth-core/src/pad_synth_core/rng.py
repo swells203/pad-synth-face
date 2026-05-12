@@ -13,8 +13,10 @@ import numpy as np
 def derive_sample_seed(
     master_seed: int, modality: str, attack_type: str, sample_index: int
 ) -> int:
-    payload = f"{master_seed}|{modality}|{attack_type}|{sample_index}".encode()
+    parts = [str(master_seed), modality, attack_type, str(sample_index)]
+    payload = "|".join(f"{len(p)}:{p}" for p in parts).encode()
     digest = hashlib.sha256(payload).digest()
+    # Truncate to uint32 — numpy's default_rng accepts seeds in [0, 2**32).
     return int.from_bytes(digest[:4], "big")
 
 
