@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: pipx install uv
+      - name: Sync workspace
+        run: uv sync --all-extras
+      - name: Lint
+        run: uv run ruff check .
+      - name: Unit tests
+        run: uv run pytest -v --ignore=tests/test_determinism_golden.py
+      - name: Determinism golden test
+        run: uv run pytest tests/test_determinism_golden.py -v
