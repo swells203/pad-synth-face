@@ -27,6 +27,14 @@ MOBILE_FRONT_2024 = SensorPreset(
     vignette_strength=0.35,
 )
 
+WEBCAM_1080P = SensorPreset(
+    name="webcam-1080p",
+    iso_range=(200, 1600),
+    jpeg_qf_range=(70, 92),
+    wb_k_range=(3200, 6000),
+    vignette_strength=0.20,
+)
+
 
 def _vignette(img: np.ndarray, strength: float) -> np.ndarray:
     h, w = img.shape[:2]
