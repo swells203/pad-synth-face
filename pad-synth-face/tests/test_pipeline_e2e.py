@@ -42,14 +42,22 @@ def test_run_pipeline_produces_manifest_and_images(
     summary = run_pipeline(cfg_path)
     assert summary["samples_generated"] == 8 * 2  # 8 identities × 2 samples
     assert summary["samples_failed"] == 0
+    assert summary["bonafide_emitted"] == 8
+    assert summary["bonafide_failed"] == 0
 
     manifest_path = Path(config["run"]["output"]) / "manifest.jsonl"
     lines = manifest_path.read_text().strip().split("\n")
-    assert len(lines) == 16
+    assert len(lines) == 16 + 8  # 16 attacks + 8 bonafide
     sample = json.loads(lines[0])
     assert sample["modality"] == "face"
-    assert sample["attack_type"] in {"print", "replay"}
     assert (Path(config["run"]["output"]) / sample["output_path"]).exists()
+
+    bonafide_jpegs = list((Path(config["run"]["output"]) / "face" / "bonafide").glob("*.jpg"))
+    assert len(bonafide_jpegs) == 8
+
+    labels = [json.loads(line)["label"] for line in lines]
+    assert "bonafide" in labels
+    assert "attack" in labels
 
 
 def test_run_pipeline_is_resumable(fixture_bonafide_dir: Path, tmp_path: Path):
@@ -79,8 +87,10 @@ def test_run_pipeline_is_resumable(fixture_bonafide_dir: Path, tmp_path: Path):
     first = run_pipeline(cfg_path)
     second = run_pipeline(cfg_path)  # everything already done
     assert first["samples_generated"] == 8
+    assert first["bonafide_emitted"] == 8
     assert second["samples_generated"] == 0
     assert second["samples_skipped_existing"] == 8
+    assert second["bonafide_emitted"] == 0
 
 
 def test_run_pipeline_counts_empty_identity_as_failure(tmp_path: Path):
@@ -111,3 +121,4 @@ def test_run_pipeline_counts_empty_identity_as_failure(tmp_path: Path):
     summary = run_pipeline(cfg_path)
     assert summary["samples_generated"] == 0
     assert summary["samples_failed"] == 1
+    assert summary["bonafide_failed"] == 1
