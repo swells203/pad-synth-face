@@ -1,0 +1,21 @@
+run:
+  name: phase1_smoke
+  output: ./datasets/phase1_smoke
+  seed: 20260511
+  deterministic: true
+
+modality: face
+
+bonafide:
+  root: ./datasets/_fixtures/digiface
+  samples_per_bonafide: 6
+
+attacks:
+  print:
+    weight: 1.0
+    ontology: ./ontology/face/print.yaml
+  replay:
+    weight: 1.0
+    ontology: ./ontology/face/replay.yaml
+
+sensor_preset: mobile-front-2024
