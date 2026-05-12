@@ -84,11 +84,9 @@ test/                                    # repo root (existing)
 - Create: `ruff.toml`
 - Create: `pad-synth-core/pyproject.toml`
 - Create: `pad-synth-core/src/pad_synth_core/__init__.py`
-- Create: `pad-synth-core/tests/__init__.py`
 - Create: `pad-synth-core/tests/test_smoke.py`
 - Create: `pad-synth-face/pyproject.toml`
 - Create: `pad-synth-face/src/pad_synth_face/__init__.py`
-- Create: `pad-synth-face/tests/__init__.py`
 - Create: `pad-synth-face/tests/test_smoke.py`
 - Create: `.gitignore`
 
