@@ -30,7 +30,7 @@ class SampleRecord(BaseModel):
     sample_id: str
     modality: Literal["face", "voice"]
     label: Literal["bonafide", "attack"]
-    attack_type: str | None
+    attack_type: str | None = None
     bonafide_source: BonafideSource
     attack_params: dict[str, Any] = Field(default_factory=dict)
     sensor_preset: str | None = None
@@ -70,7 +70,11 @@ class ManifestWriter:
                 line = line.strip()
                 if not line:
                     continue
-                ids.add(json.loads(line)["sample_id"])
+                try:
+                    ids.add(json.loads(line)["sample_id"])
+                except (json.JSONDecodeError, KeyError):
+                    # Tolerate a partial trailing line from a prior crash.
+                    continue
         return ids
 
     def existing_sample_ids(self) -> set[str]:

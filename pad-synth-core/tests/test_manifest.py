@@ -68,3 +68,26 @@ def test_manifest_writer_is_resumable(tmp_path: Path):
 
     lines = path.read_text().strip().split("\n")
     assert len(lines) == 2
+
+
+def test_manifest_writer_skips_same_instance_duplicates(tmp_path: Path):
+    path = tmp_path / "manifest.jsonl"
+    writer = ManifestWriter(path)
+    writer.append(make_record("dup"))
+    writer.append(make_record("dup"))
+    writer.append(make_record("dup"))
+    writer.close()
+
+    lines = path.read_text().strip().split("\n")
+    assert len(lines) == 1
+
+
+def test_manifest_writer_tolerates_partial_last_line(tmp_path: Path):
+    path = tmp_path / "manifest.jsonl"
+    # Simulate a prior crash: one complete record + one truncated record (no
+    # trailing newline, missing closing brace).
+    path.write_text('{"sample_id": "ok", "label": "attack"}\n{"sample_id": "partial')
+
+    writer = ManifestWriter(path)
+    assert writer.existing_sample_ids() == {"ok"}
+    writer.close()
