@@ -46,3 +46,41 @@ def test_identity_disjoint_fails_on_leak(tmp_path: Path):
     result = verify_identity_disjoint(manifest)
     assert not result.ok
     assert "00" in result.reason
+
+
+def test_identity_disjoint_check_works_on_real_pipeline_output(tmp_path):
+    """Smoke test: after a real pipeline run, verify_identity_disjoint should
+    correctly read the split field from each SampleRecord and confirm no leak."""
+    import yaml
+    from pathlib import Path
+    from pad_synth_face._fixtures import build_fixture_bonafide
+    from pad_synth_face.pipeline import run_pipeline
+
+    repo_root = Path(__file__).resolve().parents[2]
+    fixture = build_fixture_bonafide(tmp_path / "digiface")
+    config = {
+        "run": {"name": "t", "output": str(tmp_path / "out"), "seed": 11, "deterministic": True},
+        "modality": "face",
+        "bonafide": {
+            "root": str(fixture),
+            "samples_per_bonafide": 1,
+            "splits": {"train": 0.5, "dev": 0.25, "test": 0.25},
+        },
+        "attacks": {
+            "print": {"weight": 1.0, "ontology": str(repo_root / "ontology" / "face" / "print.yaml")},
+        },
+        "sensor_preset": "mobile-front-2024",
+    }
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(yaml.safe_dump(config))
+    run_pipeline(cfg_path)
+    manifest = Path(config["run"]["output"]) / "manifest.jsonl"
+
+    # Every record should now have a split field populated.
+    import json
+    rows = [json.loads(line) for line in manifest.read_text().splitlines() if line.strip()]
+    assert all(r["split"] in {"train", "dev", "test"} for r in rows)
+
+    # verify_identity_disjoint should pass on real pipeline output.
+    result = verify_identity_disjoint(manifest)
+    assert result.ok, result.reason

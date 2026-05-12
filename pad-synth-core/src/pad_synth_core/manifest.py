@@ -31,6 +31,7 @@ class SampleRecord(BaseModel):
     modality: Literal["face", "voice"]
     label: Literal["bonafide", "attack"]
     attack_type: str | None = None
+    split: Literal["train", "dev", "test"] | None = None
     bonafide_source: BonafideSource
     attack_params: dict[str, Any] = Field(default_factory=dict)
     sensor_preset: str | None = None

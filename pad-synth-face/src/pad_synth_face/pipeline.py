@@ -75,6 +75,20 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
     loader = DigiFaceLoader(Path(cfg["bonafide"]["root"]))
     bonafide_ids = loader.list_identities()
 
+    # Compute identity-disjoint splits. Default ratios if not in config.
+    split_cfg = cfg["bonafide"].get("splits", {"train": 0.7, "dev": 0.15, "test": 0.15})
+    train_ids, dev_ids, test_ids = loader.identity_disjoint_split(
+        seed=cfg["run"]["seed"],
+        ratios=(split_cfg["train"], split_cfg["dev"], split_cfg["test"]),
+    )
+    id_to_split: dict[str, str] = {}
+    for tid in train_ids:
+        id_to_split[tid] = "train"
+    for did in dev_ids:
+        id_to_split[did] = "dev"
+    for sid in test_ids:
+        id_to_split[sid] = "test"
+
     attack_weights = {k: float(v["weight"]) for k, v in cfg["attacks"].items()}
     attack_modules = {
         name: _ATTACK_REGISTRY[name](load_ontology(Path(spec["ontology"])))
@@ -139,6 +153,7 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
                 modality="face",
                 label="bonafide",
                 attack_type=None,
+                split=id_to_split[bid],
                 bonafide_source=BonafideSource(
                     dataset="digiface_fixture", id=bid, license="MIT"
                 ),
@@ -191,6 +206,7 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
                 modality="face",
                 label="attack",
                 attack_type=it.attack_type,
+                split=id_to_split[it.bonafide_id],
                 bonafide_source=BonafideSource(
                     dataset="digiface_fixture",
                     id=it.bonafide_id,
