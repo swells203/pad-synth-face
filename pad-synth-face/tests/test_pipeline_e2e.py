@@ -124,3 +124,36 @@ def test_run_pipeline_counts_empty_identity_as_failure(tmp_path: Path):
     assert summary["samples_generated"] == 0
     assert summary["samples_failed"] == 1
     assert summary["bonafide_failed"] == 1
+
+
+def test_pipeline_accepts_webcam_1080p_preset(
+    fixture_bonafide_dir: Path, tmp_path: Path
+):
+    config = {
+        "run": {
+            "name": "webcam_smoke",
+            "output": str(tmp_path / "out"),
+            "seed": 1,
+            "deterministic": True,
+        },
+        "modality": "face",
+        "bonafide": {"root": str(fixture_bonafide_dir), "samples_per_bonafide": 1},
+        "attacks": {
+            "print": {
+                "weight": 1.0,
+                "ontology": str(REPO_ROOT / "ontology" / "face" / "print.yaml"),
+            },
+        },
+        "sensor_preset": "webcam-1080p",
+    }
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(yaml.safe_dump(config))
+
+    summary = run_pipeline(cfg_path)
+    assert summary["samples_generated"] == 8
+    assert summary["bonafide_emitted"] == 8
+
+    # Spot-check that one manifest record records the webcam preset.
+    manifest_path = Path(config["run"]["output"]) / "manifest.jsonl"
+    first = json.loads(manifest_path.read_text().splitlines()[0])
+    assert first["sensor_preset"] == "webcam-1080p"

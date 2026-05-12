@@ -31,11 +31,14 @@ from pad_synth_core.rng import derive_sample_seed, sample_rng
 from pad_synth_face.attacks.print import PrintAttack
 from pad_synth_face.attacks.replay import ReplayAttack
 from pad_synth_face.bonafide import DigiFaceLoader
-from pad_synth_face.sensor import MOBILE_FRONT_2024, apply_sensor
+from pad_synth_face.sensor import MOBILE_FRONT_2024, WEBCAM_1080P, apply_sensor
 
 
 _ATTACK_REGISTRY = {"print": PrintAttack, "replay": ReplayAttack}
-_SENSOR_REGISTRY = {"mobile-front-2024": MOBILE_FRONT_2024}
+_SENSOR_REGISTRY = {
+    "mobile-front-2024": MOBILE_FRONT_2024,
+    "webcam-1080p": WEBCAM_1080P,
+}
 _FIXED_IMAGE_SHAPE = (64, 64, 3)
 
 
