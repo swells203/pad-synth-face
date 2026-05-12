@@ -93,6 +93,9 @@ def build_extended_fixture_bonafide(root: Path) -> Path:
             face = np.tile(base, (64, 64, 1))  # (h, w, 3)
             face = face * oval[:, :, None] * eye[:, :, None]
             # Background outside the oval falls toward neutral grey.
+            # Note: oval is already applied to `face` above; using it again as the
+            # alpha factor here is intentional — produces edge darkening (oval^2
+            # weighting) that increases the domain gap to Set A's flat blobs.
             background = np.full((64, 64, 3), 90.0, dtype=np.float32)
             blend = oval[:, :, None]
             arr = face * blend + background * (1.0 - blend)
