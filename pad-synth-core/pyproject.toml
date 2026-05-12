@@ -14,3 +14,4 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
+eval = ["torch>=2.2", "scikit-learn>=1.4"]
