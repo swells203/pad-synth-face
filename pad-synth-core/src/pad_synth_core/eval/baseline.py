@@ -80,18 +80,50 @@ def compute_eer(scores: list[float], labels: list[int]) -> float:
     return float(eer)
 
 
-def train_and_eval_tiny_cnn(
-    dataset_root: Path,
-    epochs: int = 1,
+def _eval_loader(model: nn.Module, dl: DataLoader) -> tuple[float, float]:
+    """Run a model over a dataloader; return (EER, accuracy)."""
+    scores: list[float] = []
+    labels: list[int] = []
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for x, y in dl:
+            logits = model(x)
+            probs = torch.softmax(logits, dim=1)[:, 1].tolist()
+            scores.extend(probs)
+            labels.extend(y.tolist())
+            preds = logits.argmax(dim=1)
+            correct += int((preds == y).sum())
+            total += int(y.numel())
+    return compute_eer(scores, labels), correct / max(total, 1)
+
+
+def train_and_cross_domain_eval(
+    train_root: Path,
+    eval_root: Path | None = None,
+    epochs: int = 8,
     batch_size: int = 8,
     seed: int = 0,
 ) -> dict[str, Any]:
+    """Train a TinyCNN on train_root; eval in-domain (held-out split) and
+    optionally cross-domain (full eval_root if provided).
+
+    Returns a dict with keys:
+        eer_in_domain (float)
+        val_accuracy_in_domain (float)
+        n_train (int)
+        n_val_in_domain (int)
+        eer_cross_domain (float | None)
+        val_accuracy_cross_domain (float | None)
+        n_val_cross_domain (int | None)
+    """
     torch.manual_seed(seed)
-    ds = TinyPADDataset(dataset_root)
-    n_val = max(1, len(ds) // 4)
-    n_train = len(ds) - n_val
+    train_ds_full = TinyPADDataset(train_root)
+    n_val = max(1, len(train_ds_full) // 4)
+    n_train = len(train_ds_full) - n_val
     train_ds, val_ds = torch.utils.data.random_split(
-        ds, [n_train, n_val], generator=torch.Generator().manual_seed(seed)
+        train_ds_full, [n_train, n_val],
+        generator=torch.Generator().manual_seed(seed),
     )
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_dl = DataLoader(val_ds, batch_size=batch_size)
@@ -108,23 +140,48 @@ def train_and_eval_tiny_cnn(
             opt.step()
 
     model.eval()
-    scores: list[float] = []
-    labels: list[int] = []
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for x, y in val_dl:
-            logits = model(x)
-            probs = torch.softmax(logits, dim=1)[:, 1].tolist()
-            scores.extend(probs)
-            labels.extend(y.tolist())
-            preds = logits.argmax(dim=1)
-            correct += int((preds == y).sum())
-            total += int(y.numel())
+    in_eer, in_acc = _eval_loader(model, val_dl)
+
+    cross_eer: float | None = None
+    cross_acc: float | None = None
+    n_val_cross: int | None = None
+    if eval_root is not None:
+        cross_ds = TinyPADDataset(eval_root)
+        cross_dl = DataLoader(cross_ds, batch_size=batch_size)
+        cross_eer, cross_acc = _eval_loader(model, cross_dl)
+        n_val_cross = len(cross_ds)
 
     return {
-        "eer": compute_eer(scores, labels),
-        "val_accuracy": correct / max(total, 1),
+        "eer_in_domain": in_eer,
+        "val_accuracy_in_domain": in_acc,
         "n_train": n_train,
-        "n_val": n_val,
+        "n_val_in_domain": n_val,
+        "eer_cross_domain": cross_eer,
+        "val_accuracy_cross_domain": cross_acc,
+        "n_val_cross_domain": n_val_cross,
+    }
+
+
+def train_and_eval_tiny_cnn(
+    dataset_root: Path,
+    epochs: int = 1,
+    batch_size: int = 8,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Backward-compatible wrapper around train_and_cross_domain_eval.
+
+    Returns the original field names: eer, val_accuracy, n_train, n_val.
+    """
+    full = train_and_cross_domain_eval(
+        train_root=dataset_root,
+        eval_root=None,
+        epochs=epochs,
+        batch_size=batch_size,
+        seed=seed,
+    )
+    return {
+        "eer": full["eer_in_domain"],
+        "val_accuracy": full["val_accuracy_in_domain"],
+        "n_train": full["n_train"],
+        "n_val": full["n_val_in_domain"],
     }

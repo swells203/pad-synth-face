@@ -21,3 +21,85 @@ def build_fixture_bonafide(root: Path) -> Path:
             arr = np.clip(arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
             Image.fromarray(arr).save(identity_dir / f"{sample}.png")
     return root
+
+
+# Fitzpatrick-inspired skin-tone base colors (RGB). Not personally identifying;
+# these are abstract palette anchors approximating ranges documented in
+# Krishnapriya et al., "Issues Related to Face Recognition Accuracy Varying
+# Based on Race and Skin Tone", IEEE Trans. Tech. Soc. 2020.
+_SKIN_TONE_PALETTE: list[tuple[int, int, int]] = [
+    (244, 219, 196),  # very light
+    (224, 192, 165),
+    (199, 158, 125),
+    (170, 124, 92),
+    (133, 90, 60),
+    (95, 60, 38),
+    (215, 175, 135),  # warm light
+    (185, 140, 105),
+    (155, 110, 80),
+    (120, 85, 60),
+    (235, 200, 170),
+    (205, 165, 130),
+    (175, 130, 95),
+    (145, 105, 75),
+    (115, 85, 65),
+    (90, 65, 45),
+]
+
+
+def _oval_mask(h: int, w: int) -> np.ndarray:
+    """Face-shaped Gaussian falloff: 1.0 at center, ~0.3 at the corners."""
+    yv, xv = np.mgrid[0:h, 0:w].astype(np.float32)
+    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
+    # Wider horizontally is less face-shaped; use slight ovalness.
+    ry, rx = h * 0.42, w * 0.36
+    r = np.sqrt(((yv - cy) / ry) ** 2 + ((xv - cx) / rx) ** 2)
+    mask = np.exp(-(r**2) * 1.4)
+    return np.clip(mask, 0.3, 1.0)
+
+
+def _eye_region_darken(h: int, w: int) -> np.ndarray:
+    """Darken patches at expected eye y-band (~30-45% from top)."""
+    out = np.ones((h, w), dtype=np.float32)
+    y_eye_top, y_eye_bot = int(h * 0.30), int(h * 0.45)
+    # Left and right eye patches.
+    for x_lo, x_hi in [(int(w * 0.22), int(w * 0.40)),
+                       (int(w * 0.60), int(w * 0.78))]:
+        out[y_eye_top:y_eye_bot, x_lo:x_hi] *= 0.65
+    return out
+
+
+def build_extended_fixture_bonafide(root: Path) -> Path:
+    """Phase 1.5 Set B bonafide fixture.
+
+    16 identities x 4 samples each. Each identity has a base skin-tone color
+    drawn from a Fitzpatrick-inspired palette. Each image is a 64x64 RGB image
+    with an oval face silhouette (Gaussian falloff from center) and darker
+    eye-region patches. Per-sample noise gives 4 distinct images per identity.
+
+    This is a procedural fixture for the synthetic cross-domain eval proxy
+    -- not a substitute for real face data. See LIMITATIONS.md.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(1)  # different from basic fixture's seed (0)
+    oval = _oval_mask(64, 64)
+    eye = _eye_region_darken(64, 64)
+    for identity in range(16):
+        identity_dir = root / f"{identity:08d}"
+        identity_dir.mkdir(exist_ok=True)
+        base = np.array(_SKIN_TONE_PALETTE[identity], dtype=np.float32)
+        for sample in range(4):
+            # Background base * oval * eye attenuation, then per-sample noise.
+            face = np.tile(base, (64, 64, 1))  # (h, w, 3)
+            face = face * oval[:, :, None] * eye[:, :, None]
+            # Background outside the oval falls toward neutral grey.
+            # Note: oval is already applied to `face` above; using it again as the
+            # alpha factor here is intentional — produces edge darkening (oval^2
+            # weighting) that increases the domain gap to Set A's flat blobs.
+            background = np.full((64, 64, 3), 90.0, dtype=np.float32)
+            blend = oval[:, :, None]
+            arr = face * blend + background * (1.0 - blend)
+            noise = rng.integers(-15, 15, size=(64, 64, 3), dtype=np.int16)
+            arr = np.clip(arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+            Image.fromarray(arr).save(identity_dir / f"{sample}.png")
+    return root

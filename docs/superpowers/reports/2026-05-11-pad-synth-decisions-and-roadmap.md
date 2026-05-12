@@ -156,15 +156,29 @@ The original pipeline emitted *one* bonafide sample per identity, treating bonaf
 
 The matrix is explicit in the Phase 1.5 spec §7 so future decision-making is traceable to evidence.
 
+### 4.5 Phase 1.5 outcome (measured 2026-05-12)
+
+| Metric | Value |
+|---|---|
+| `eer_in_domain` (seed 0, epochs 10) | **0.29** |
+| `eer_cross_domain` (seed 0, epochs 10) | **0.36** |
+| `eer_cross_domain` range across seeds 0–3 | [0.31, 0.45], mean ≈ 0.39 |
+| `n_train` | 72 |
+| `n_val_cross_domain` | 128 (64 bonafide + 64 attacks in Set B) |
+
+**Decision-matrix outcome: Hybrid.** Cross-domain EER (0.36 seed 0; 0.39 mean) lands solidly in the 0.30–0.45 band. The detector is generalizing partially across distribution shift but degrading meaningfully (from 0.29 to 0.36 EER, a +0.07 increase).
+
+**Phase 2 recommendation: implement print physics improvements (halftoning + ICC color management) *and* add the mask attack in parallel.** The two are independent enough to ship together; the physics work shows whether weak physics was the in-domain bottleneck, and the mask work expands attack coverage. Defer the deepfake module to Phase 2.5 once the hybrid result clarifies which lever moves the EER more.
+
+**Uncertainty caveat:** with 128 cross-domain eval samples, the EER has roughly ±0.07 noise across seeds. The hybrid call is robust to this — every seed in [0, 3] landed in the hybrid band — but seed 1's 0.45 reading touched the "go deep" threshold. If a future re-run with larger eval sets pushes the mean above 0.45, revisit the recommendation.
+
 ---
 
 ## 5. Recommendations for Future Progress
 
-### 5.1 Immediate (Phase 1.5 implementation)
+### 5.1 Phase 1.5 status (complete as of 2026-05-12)
 
-1. Implement Phase 1.5 per the committed design spec. ~8 small tasks; should complete in one session.
-2. Run the cross-domain eval; commit the resulting EER to `qc/cross_domain_eval/history.jsonl`.
-3. Use the decision matrix in §4.4 to settle the Phase 2 direction.
+Phase 1.5 shipped on branch `feat/pad-synth-phase1_5`. Headline cross-domain EER 0.36 → hybrid Phase 2 direction. See §4.5 for full numbers.
 
 ### 5.2 Phase 2 candidate scopes (depending on Phase 1.5 outcome)
 
@@ -185,6 +199,8 @@ The matrix is explicit in the Phase 1.5 spec §7 so future decision-making is tr
 **If "hybrid" wins** (0.30–0.45):
 - Improve print physics (halftoning + ICC) — cheaper of the two go-deep options
 - Add mask attack only (not deepfake) — cheaper of the two go-wide options
+
+**As of Phase 1.5 (2026-05-12):** the cross-domain EER measurement (0.36) selected this path. The actual Phase 2 plan should scope: (a) print physics improvements — halftoning + ICC profile simulation, and (b) mask attack — FLAME or 3DMM reconstruction + material rendering. Defer deepfake module to Phase 2.5.
 
 ### 5.3 Real-data integration (Phase 2 or 2.5 — independent of deep/wide choice)
 
@@ -251,6 +267,8 @@ Once Phase 2 and Phase 3 are stable and the headline EER is meaningful:
 3. Vary source image per attack sample (currently always uses `bonafide_samples[0]`)
 4. Add a `pad-synth-face init-fixture` CLI subcommand so `phase1_smoke.yaml` runs on a fresh clone
 5. Type-annotate `_ATTACK_REGISTRY: dict[str, type[FaceAttackModule]]` for static safety
+6. **(New, Phase 1.5):** The CLI's `eval` subcommand writes to stdout only; spec §4.5 said it should also append to `qc/cross_domain_eval/history.jsonl` for trend tracking. Currently done via shell redirect in the final-verification step. Move into the CLI for a clean history audit trail.
+7. **(New, Phase 1.5):** Multi-seed reporting for the `eval` subcommand. Cross-domain EER at this dataset size has ~±0.07 noise across seeds; a `--seeds 0,1,2` option that reports min/mean/max would prevent over-reading any single number.
 
 ---
 
@@ -261,11 +279,13 @@ Once Phase 2 and Phase 3 are stable and the headline EER is meaningful:
 | Original full design spec | `docs/superpowers/specs/2026-05-11-pad-synthetic-dataset-design.md` | `0585c01` |
 | Phase 1 implementation plan | `docs/superpowers/plans/2026-05-11-pad-synth-phase1.md` | `b969613` |
 | Phase 1.5 design spec | `docs/superpowers/specs/2026-05-11-pad-synth-phase1_5-design.md` | `9a6677a` |
+| Phase 1.5 implementation plan | `docs/superpowers/plans/2026-05-11-pad-synth-phase1_5.md` | `e243675` |
 | Phase 1 merge to main | — | `0a04114` |
 | Eval-loop closure | — | `d382a6c` |
-| Current `main` HEAD | — | `9a6677a` |
-| Test count | 55 passing | — |
-| Headline EER (in-domain, balanced) | 0.37 | smoke run with seed `20260511` |
+| Phase 1.5 branch HEAD | `feat/pad-synth-phase1_5` | `0644dee` |
+| Test count after Phase 1.5 | 70 passing | — |
+| Phase 1 headline EER (in-domain, balanced) | 0.37 | smoke run with seed `20260511` |
+| Phase 1.5 cross-domain EER (seed 0, epochs 10) | **0.36** | hybrid band → Phase 2 = print physics + mask attack |
 
 ---
 
