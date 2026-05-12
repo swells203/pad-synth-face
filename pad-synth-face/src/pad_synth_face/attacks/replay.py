@@ -5,8 +5,9 @@ Pipeline (MVP):
   2. Subpixel grid attenuation (column-stripe attenuation modeling phone OLED/LCD)
   3. Moire pattern: 2D sinusoid at a frequency near the subpixel grid for beating
   4. Bezel masking: darken pixels in a bezel_pct frame
-  5. Viewing-angle skew: small affine shear
-  6. Display gamma inverse + ambient_reflection low-frequency overlay
+  5. Display gamma inverse
+  6. Optional ambient_reflection low-frequency sheen overlay
+  7. Viewing-angle skew: small affine shear
 
 Refresh-rate banding and per-device subpixel-pattern shapes are simplified to
 a single column-stripe model for Phase 1.
