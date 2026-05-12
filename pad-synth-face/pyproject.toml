@@ -16,5 +16,8 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 
+[project.scripts]
+pad-synth-face = "pad_synth_face.cli:main"
+
 [tool.uv.sources]
 pad-synth-core = { workspace = true }
