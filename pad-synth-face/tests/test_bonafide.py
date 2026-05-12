@@ -33,3 +33,15 @@ def test_identity_disjoint_split_is_deterministic(fixture_bonafide_dir: Path):
     assert not (set(train) & set(dev))
     assert not (set(train) & set(test))
     assert not (set(dev) & set(test))
+
+
+def test_identity_disjoint_split_all_to_test(fixture_bonafide_dir: Path):
+    """When ratios are (0, 0, 1), every identity must land in the test split."""
+    loader = DigiFaceLoader(fixture_bonafide_dir)
+    train, dev, test = loader.identity_disjoint_split(
+        seed=0, ratios=(0.0, 0.0, 1.0)
+    )
+    assert train == []
+    assert dev == []
+    assert set(test) == set(loader.list_identities())
+    assert len(test) == 8
