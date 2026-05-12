@@ -90,77 +90,77 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
         samples_per_bonafide=int(cfg["bonafide"]["samples_per_bonafide"]),
     )
 
-    manifest = ManifestWriter(out_root / "manifest.jsonl")
-    ledger = ProvenanceLedger(out_root / "provenance.jsonl")
-    ledger.record(
-        BonafideIngested(
-            name="digiface_fixture",
-            license="MIT",
-            source_url=str(cfg["bonafide"]["root"]),
-            sha256_of_index=hashlib.sha256(
-                "|".join(bonafide_ids).encode()
-            ).hexdigest(),
-        )
-    )
-    for name, spec in cfg["attacks"].items():
-        _record_ontology_citations(ledger, name, Path(spec["ontology"]))
-
-    generated = 0
-    failed = 0
-    skipped = 0
-    existing = manifest.existing_sample_ids()
-
-    for it in items:
-        if it.sample_id in existing:
-            skipped += 1
-            continue
-        rng = sample_rng(it.seed)
-        sample_dir = out_root / "face" / it.attack_type
-        sample_dir.mkdir(parents=True, exist_ok=True)
-
-        bonafide_samples = loader.samples_for_identity(it.bonafide_id)
-        bonafide_arr = loader.load(bonafide_samples[0])
-
-        module = attack_modules[it.attack_type]
-        attack_params = module.sample_params(rng)
-        attacked = module.simulate(bonafide_arr, attack_params, rng)
-        sensored, sensor_params = apply_sensor(attacked, sensor_preset, rng)
-
-        qc = check_image_basic(sensored, _FIXED_IMAGE_SHAPE)
-        if not qc.ok:
-            failed += 1
-            continue
-
-        out_path_rel = f"face/{it.attack_type}/{it.sample_id}.jpg"
-        out_path_abs = out_root / out_path_rel
-        Image.fromarray(sensored).save(out_path_abs, format="JPEG", quality=92)
-        sha = hashlib.sha256(out_path_abs.read_bytes()).hexdigest()
-
-        rec = SampleRecord(
-            sample_id=it.sample_id,
-            modality="face",
-            label="attack",
-            attack_type=it.attack_type,
-            bonafide_source=BonafideSource(
-                dataset="digiface_fixture",
-                id=it.bonafide_id,
+    with ManifestWriter(out_root / "manifest.jsonl") as manifest, \
+            ProvenanceLedger(out_root / "provenance.jsonl") as ledger:
+        ledger.record(
+            BonafideIngested(
+                name="digiface_fixture",
                 license="MIT",
-            ),
-            attack_params=attack_params,
-            sensor_preset=sensor_preset.name,
-            sensor_params=sensor_params,
-            pipeline_version=f"pad-synth-face@{pad_synth_face.__version__}",
-            core_version=f"pad-synth-core@{pad_synth_core.__version__}",
-            ontology_version="2026-05-11",
-            seed=it.seed,
-            output_path=out_path_rel,
-            output_sha256=sha,
+                source_url=str(cfg["bonafide"]["root"]),
+                sha256_of_index=hashlib.sha256(
+                    "|".join(bonafide_ids).encode()
+                ).hexdigest(),
+            )
         )
-        manifest.append(rec)
-        generated += 1
+        for name, spec in cfg["attacks"].items():
+            _record_ontology_citations(ledger, name, Path(spec["ontology"]))
 
-    manifest.close()
-    ledger.close()
+        generated = 0
+        failed = 0
+        skipped = 0
+        existing = manifest.existing_sample_ids()
+
+        for it in items:
+            if it.sample_id in existing:
+                skipped += 1
+                continue
+            rng = sample_rng(it.seed)
+            sample_dir = out_root / "face" / it.attack_type
+            sample_dir.mkdir(parents=True, exist_ok=True)
+
+            bonafide_samples = loader.samples_for_identity(it.bonafide_id)
+            if not bonafide_samples:
+                failed += 1
+                continue
+            bonafide_arr = loader.load(bonafide_samples[0])
+
+            module = attack_modules[it.attack_type]
+            attack_params = module.sample_params(rng)
+            attacked = module.simulate(bonafide_arr, attack_params, rng)
+            sensored, sensor_params = apply_sensor(attacked, sensor_preset, rng)
+
+            qc = check_image_basic(sensored, _FIXED_IMAGE_SHAPE)
+            if not qc.ok:
+                failed += 1
+                continue
+
+            out_path_rel = f"face/{it.attack_type}/{it.sample_id}.jpg"
+            out_path_abs = out_root / out_path_rel
+            Image.fromarray(sensored).save(out_path_abs, format="JPEG", quality=92)
+            sha = hashlib.sha256(out_path_abs.read_bytes()).hexdigest()
+
+            rec = SampleRecord(
+                sample_id=it.sample_id,
+                modality="face",
+                label="attack",
+                attack_type=it.attack_type,
+                bonafide_source=BonafideSource(
+                    dataset="digiface_fixture",
+                    id=it.bonafide_id,
+                    license="MIT",
+                ),
+                attack_params=attack_params,
+                sensor_preset=sensor_preset.name,
+                sensor_params=sensor_params,
+                pipeline_version=f"pad-synth-face@{pad_synth_face.__version__}",
+                core_version=f"pad-synth-core@{pad_synth_core.__version__}",
+                ontology_version="2026-05-11",
+                seed=it.seed,
+                output_path=out_path_rel,
+                output_sha256=sha,
+            )
+            manifest.append(rec)
+            generated += 1
 
     return {
         "samples_generated": generated,

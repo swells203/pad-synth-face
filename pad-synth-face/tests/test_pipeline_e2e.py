@@ -81,3 +81,33 @@ def test_run_pipeline_is_resumable(fixture_bonafide_dir: Path, tmp_path: Path):
     assert first["samples_generated"] == 8
     assert second["samples_generated"] == 0
     assert second["samples_skipped_existing"] == 8
+
+
+def test_run_pipeline_counts_empty_identity_as_failure(tmp_path: Path):
+    # Build a bonafide root with one identity that has no PNGs.
+    fixture_root = tmp_path / "bad_fixture"
+    (fixture_root / "00000000").mkdir(parents=True)  # empty directory
+
+    config = {
+        "run": {
+            "name": "smoke",
+            "output": str(tmp_path / "out"),
+            "seed": 1,
+            "deterministic": True,
+        },
+        "modality": "face",
+        "bonafide": {"root": str(fixture_root), "samples_per_bonafide": 1},
+        "attacks": {
+            "print": {
+                "weight": 1.0,
+                "ontology": str(REPO_ROOT / "ontology" / "face" / "print.yaml"),
+            },
+        },
+        "sensor_preset": "mobile-front-2024",
+    }
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(yaml.safe_dump(config))
+
+    summary = run_pipeline(cfg_path)
+    assert summary["samples_generated"] == 0
+    assert summary["samples_failed"] == 1
