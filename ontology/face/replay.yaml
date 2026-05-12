@@ -1,0 +1,38 @@
+version: "2026-05-11"
+attack_type: replay
+axes:
+  device_class:
+    type: categorical
+    values: [phone_oled, phone_lcd, tablet, laptop, desktop_monitor]
+    weights: [0.30, 0.25, 0.20, 0.15, 0.10]
+    provenance:
+      paper: "Boulkenafet et al., OULU-NPU 2017 (device mix in mobile capture scenarios)"
+      doi: "10.1109/FG.2017.77"
+  bezel_pct:
+    type: uniform
+    low: 1.0
+    high: 12.0
+    provenance:
+      paper: "Device teardown spec aggregation; consistent with screen-to-body ratios documented in iFixit teardowns 2020-2024"
+      url: "https://www.ifixit.com/Device"
+  viewing_angle:
+    type: uniform
+    low: -35.0
+    high: 35.0
+    provenance:
+      paper: "Patel et al., 'Secure Face Unlock: Spoof Detection on Smartphones', IEEE TIFS 2016 (replay capture geometry)"
+      doi: "10.1109/TIFS.2016.2559512"
+  refresh_hz:
+    type: categorical
+    values: [60, 90, 120, 144]
+    weights: [0.55, 0.15, 0.20, 0.10]
+    provenance:
+      paper: "Common consumer display refresh rates; informed by replay-attack moire literature in Galbally 2014"
+      doi: "10.1109/ACCESS.2014.2381273"
+  ambient_reflection:
+    type: uniform
+    low: 0.0
+    high: 0.45
+    provenance:
+      paper: "Wen et al., 'Face Spoof Detection With Image Distortion Analysis', IEEE TIFS 2015"
+      doi: "10.1109/TIFS.2015.2400395"
