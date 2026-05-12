@@ -40,20 +40,22 @@ def test_run_pipeline_produces_manifest_and_images(
     cfg_path.write_text(yaml.safe_dump(config))
 
     summary = run_pipeline(cfg_path)
-    assert summary["samples_generated"] == 8 * 2  # 8 identities × 2 samples
+    # samples_per_bonafide=2, 8 identities, 2 attack types — the orchestrator
+    # emits 16 attack slots and 16 bonafide slots (samples_per_bonafide × ids).
+    assert summary["samples_generated"] == 16
     assert summary["samples_failed"] == 0
-    assert summary["bonafide_emitted"] == 8
+    assert summary["bonafide_emitted"] == 16
     assert summary["bonafide_failed"] == 0
 
     manifest_path = Path(config["run"]["output"]) / "manifest.jsonl"
     lines = manifest_path.read_text().strip().split("\n")
-    assert len(lines) == 16 + 8  # 16 attacks + 8 bonafide
+    assert len(lines) == 32  # 16 attacks + 16 bonafide
     sample = json.loads(lines[0])
     assert sample["modality"] == "face"
     assert (Path(config["run"]["output"]) / sample["output_path"]).exists()
 
     bonafide_jpegs = list((Path(config["run"]["output"]) / "face" / "bonafide").glob("*.jpg"))
-    assert len(bonafide_jpegs) == 8
+    assert len(bonafide_jpegs) == 16
 
     labels = [json.loads(line)["label"] for line in lines]
     assert "bonafide" in labels

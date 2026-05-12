@@ -48,13 +48,13 @@ def test_phase1_smoke_run_produces_complete_artifacts(tmp_path: Path):
 
     out_root = Path(config["run"]["output"])
     summary = json.loads(result.stdout)
-    assert summary["samples_generated"] == 8 * 3  # attacks
-    assert summary["bonafide_emitted"] == 8
+    assert summary["samples_generated"] == 8 * 3  # 24 attacks
+    assert summary["bonafide_emitted"] == 8 * 3  # 24 bonafide (per-identity × samples_per_bonafide)
     assert summary["samples_failed"] == 0
 
     manifest = (out_root / "manifest.jsonl").read_text().splitlines()
     provenance = (out_root / "provenance.jsonl").read_text().splitlines()
-    assert len(manifest) == 24 + 8
+    assert len(manifest) == 48  # 24 attacks + 24 bonafide
     assert any("bonafide_dataset_ingested" in line for line in provenance)
     assert any("ontology_citation" in line for line in provenance)
 

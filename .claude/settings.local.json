@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(uv --version)",
+      "Bash(git *)",
+      "Bash(python -m pytest pad-synth-core/tests/test_smoke.py -v)",
+      "Bash(python3 -m pytest pad-synth-core/tests/test_smoke.py -v)",
+      "Bash(uv sync *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(python -m pytest -v)",
+      "Bash(.venv/bin/ruff check *)",
+      "Bash(uv tool *)",
+      "Bash(grep -vc '^\\\\s*$\\\\|^\\\\s*#' /Users/stuartwells/test/pad-synth-core/src/pad_synth_core/manifest.py)",
+      "Bash(uv run *)",
+      "Bash(.venv/bin/uv sync *)",
+      "Bash(PAD_SYNTH_UPDATE_GOLDEN=1 .venv/bin/python -m pytest tests/test_determinism_golden.py -v)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(len\\(d\\), 'entries'\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(len\\(d\\), 'entries committed'\\)\")",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('/Users/stuartwells/test/.github/workflows/ci.yaml'\\)\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 *)",
+      "Bash(PAD_SYNTH_UPDATE_GOLDEN=1 .venv/bin/python -m pytest tests/test_determinism_golden.py -q)",
+      "Bash(awk -F/ '{print $\\(NF-1\\)}')"
+    ]
+  }
+}

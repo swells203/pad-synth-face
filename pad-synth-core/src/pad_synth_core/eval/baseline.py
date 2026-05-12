@@ -20,10 +20,16 @@ from torch.utils.data import DataLoader, Dataset
 class TinyPADDataset(Dataset):
     def __init__(self, root: Path) -> None:
         self.items: list[tuple[Path, int]] = []
-        for label_name, label_value in (("bonafide", 0), ("attack", 1)):
-            label_dir = root / "face" / label_name
-            for p in sorted(label_dir.glob("*.jpg")):
-                self.items.append((p, label_value))
+        face_root = root / "face"
+        # Bonafide samples live under face/bonafide/.
+        for p in sorted((face_root / "bonafide").glob("*.jpg")):
+            self.items.append((p, 0))
+        # All other face/<x>/ subdirectories are attack types (print, replay, ...).
+        for subdir in sorted(p for p in face_root.iterdir() if p.is_dir()):
+            if subdir.name == "bonafide":
+                continue
+            for p in sorted(subdir.glob("*.jpg")):
+                self.items.append((p, 1))
 
     def __len__(self) -> int:
         return len(self.items)

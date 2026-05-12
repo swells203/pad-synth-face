@@ -123,51 +123,66 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
         failed = 0
         skipped = 0
 
-        # Emit one bonafide sample per identity, BEFORE the attack loop.
+        # Emit samples_per_bonafide bonafide samples per identity, BEFORE the
+        # attack loop. Each slot gets its own derived seed → distinct sensor
+        # noise/WB/qf, so per-identity bonafide samples are visually distinct.
+        # This is what gives the PAD detector enough negative-class diversity
+        # to actually learn from; emitting one-per-identity collapses the
+        # bonafide distribution to N points and produces a degenerate EER.
+        samples_per_bonafide = int(cfg["bonafide"]["samples_per_bonafide"])
         existing = manifest.existing_sample_ids()
         bonafide_emitted = 0
         bonafide_failed = 0
-        for idx, bid in enumerate(sorted(bonafide_ids)):
-            bonafide_sid = f"face-bonafide-{idx:08d}"
-            if bonafide_sid in existing:
-                continue  # resumed; already done
+        bonafide_counter = 0
+        for bid in sorted(bonafide_ids):
             bsamples = loader.samples_for_identity(bid)
             if not bsamples:
-                bonafide_failed += 1
+                # All slots for this identity fail.
+                bonafide_failed += samples_per_bonafide
+                bonafide_counter += samples_per_bonafide
                 continue
-            bonafide_seed = derive_sample_seed(cfg["run"]["seed"], "face", "bonafide", idx)
-            rng = sample_rng(bonafide_seed)
-            arr = loader.load(bsamples[0])
-            sensored, sensor_params = apply_sensor(arr, sensor_preset, rng)
-            qc = check_image_basic(sensored, _FIXED_IMAGE_SHAPE)
-            if not qc.ok:
-                bonafide_failed += 1
-                continue
-            out_rel = f"face/bonafide/{bonafide_sid}.jpg"
-            out_abs = out_root / out_rel
-            out_abs.parent.mkdir(parents=True, exist_ok=True)
-            Image.fromarray(sensored).save(out_abs, format="JPEG", quality=92)
-            sha = hashlib.sha256(out_abs.read_bytes()).hexdigest()
-            rec = SampleRecord(
-                sample_id=bonafide_sid,
-                modality="face",
-                label="bonafide",
-                attack_type=None,
-                split=id_to_split[bid],
-                bonafide_source=BonafideSource(
-                    dataset="digiface_fixture", id=bid, license="MIT"
-                ),
-                sensor_preset=sensor_preset.name,
-                sensor_params=sensor_params,
-                pipeline_version=f"pad-synth-face@{pad_synth_face.__version__}",
-                core_version=f"pad-synth-core@{pad_synth_core.__version__}",
-                ontology_version="2026-05-11",
-                seed=bonafide_seed,
-                output_path=out_rel,
-                output_sha256=sha,
-            )
-            manifest.append(rec)
-            bonafide_emitted += 1
+            for sub in range(samples_per_bonafide):
+                bonafide_sid = f"face-bonafide-{bonafide_counter:08d}"
+                if bonafide_sid in existing:
+                    bonafide_counter += 1
+                    continue
+                bonafide_seed = derive_sample_seed(
+                    cfg["run"]["seed"], "face", "bonafide", bonafide_counter
+                )
+                rng = sample_rng(bonafide_seed)
+                arr = loader.load(bsamples[sub % len(bsamples)])
+                sensored, sensor_params = apply_sensor(arr, sensor_preset, rng)
+                qc = check_image_basic(sensored, _FIXED_IMAGE_SHAPE)
+                if not qc.ok:
+                    bonafide_failed += 1
+                    bonafide_counter += 1
+                    continue
+                out_rel = f"face/bonafide/{bonafide_sid}.jpg"
+                out_abs = out_root / out_rel
+                out_abs.parent.mkdir(parents=True, exist_ok=True)
+                Image.fromarray(sensored).save(out_abs, format="JPEG", quality=92)
+                sha = hashlib.sha256(out_abs.read_bytes()).hexdigest()
+                rec = SampleRecord(
+                    sample_id=bonafide_sid,
+                    modality="face",
+                    label="bonafide",
+                    attack_type=None,
+                    split=id_to_split[bid],
+                    bonafide_source=BonafideSource(
+                        dataset="digiface_fixture", id=bid, license="MIT"
+                    ),
+                    sensor_preset=sensor_preset.name,
+                    sensor_params=sensor_params,
+                    pipeline_version=f"pad-synth-face@{pad_synth_face.__version__}",
+                    core_version=f"pad-synth-core@{pad_synth_core.__version__}",
+                    ontology_version="2026-05-11",
+                    seed=bonafide_seed,
+                    output_path=out_rel,
+                    output_sha256=sha,
+                )
+                manifest.append(rec)
+                bonafide_emitted += 1
+                bonafide_counter += 1
 
         # Re-read existing IDs after bonafide pass to cover both sets.
         existing = manifest.existing_sample_ids()
