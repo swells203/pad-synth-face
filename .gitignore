@@ -8,3 +8,4 @@ dist/
 build/
 datasets/
 .claude/
+.superpowers/
