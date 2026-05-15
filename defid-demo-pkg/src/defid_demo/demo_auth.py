@@ -25,6 +25,11 @@ class DemoAuth(MahalanobisAuth):
         x = np.asarray(genuine, dtype=np.float64)
         var = x.var(axis=0)
         self.kept_idx = [i for i in range(x.shape[1]) if var[i] > 1e-12]
+        if not self.kept_idx:
+            raise ValueError(
+                "DemoAuth.fit: all feature columns are constant — "
+                "no usable signal (need more varied enrollment reps)"
+            )
         xk = x[:, self.kept_idx]
         self._mean = xk.mean(axis=0)
         cov = np.atleast_2d(np.cov(xk, rowvar=False))
@@ -40,6 +45,14 @@ class DemoAuth(MahalanobisAuth):
         return self
 
     def score(self, x: np.ndarray) -> np.ndarray:
+        if self._inv_cov is None or not self.kept_idx:
+            raise RuntimeError("DemoAuth.score called before fit()")
+        x = np.asarray(x, dtype=np.float64)
+        if x.ndim != 2 or x.shape[1] <= max(self.kept_idx):
+            raise ValueError(
+                f"DemoAuth.score: expected 2D input with > {max(self.kept_idx)} "
+                f"columns, got shape {x.shape}"
+            )
         d = self._project(x) - self._mean
         return np.sqrt(np.einsum("ij,jk,ik->i", d, self._inv_cov, d))
 

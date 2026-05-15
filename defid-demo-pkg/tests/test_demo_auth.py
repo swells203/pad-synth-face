@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from defid.models import MahalanobisAuth
 from defid_demo.demo_auth import DemoAuth
@@ -52,3 +53,13 @@ def test_calibrate_then_classify_separates_genuine_from_outlier():
     assert im["verdict"] == "REJECT"
     assert im["frac_above"] >= 0.5
     assert len(g["distances"]) == 5
+
+
+def test_score_before_fit_raises():
+    with pytest.raises(RuntimeError, match="before fit"):
+        DemoAuth().score(np.zeros((2, 5)))
+
+
+def test_all_constant_input_raises():
+    with pytest.raises(ValueError, match="all feature columns are constant"):
+        DemoAuth().fit(np.full((10, 4), 3.0))
