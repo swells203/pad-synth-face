@@ -1,7 +1,7 @@
 [tool.uv.workspace]
-members = ["pad-synth-core", "pad-synth-face", "defid"]
+members = ["pad-synth-core", "pad-synth-face", "defid-pkg"]
 
 [tool.pytest.ini_options]
-testpaths = ["pad-synth-core/tests", "pad-synth-face/tests", "defid/tests", "tests"]
+testpaths = ["pad-synth-core/tests", "pad-synth-face/tests", "defid-pkg/tests", "tests"]
 python_files = ["test_*.py"]
 addopts = "-ra --import-mode=importlib"

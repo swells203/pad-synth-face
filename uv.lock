@@ -101,7 +101,7 @@ nvtx = [
 [[package]]
 name = "defid"
 version = "0.1.0"
-source = { editable = "defid" }
+source = { editable = "defid-pkg" }
 dependencies = [
     { name = "numpy" },
     { name = "pad-synth-core" },
