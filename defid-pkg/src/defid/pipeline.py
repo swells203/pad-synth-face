@@ -10,9 +10,11 @@ import yaml
 
 from pad_synth_core.provenance import (
     BonafideIngested,
+    GeneratorRegistered,
     OntologyCitation,
     ProvenanceLedger,
 )
+from defid.features import FEATURE_NAMES, FEATURE_SCHEMA_VERSION
 from defid.generator import generate_session
 from defid.qc import check_session
 from defid.session import SessionManifestWriter
@@ -60,6 +62,17 @@ def run_generation(config_path: Path) -> dict[str, Any]:
             )
         )
         _record_citations(ledger, ontology_dir)
+        ledger.record(
+            GeneratorRegistered(
+                name="defid-feature-schema",
+                version=FEATURE_SCHEMA_VERSION,
+                license="OWNED",
+                commercial_ok=True,
+                model_hash=hashlib.sha256(
+                    str(list(FEATURE_NAMES)).encode()
+                ).hexdigest(),
+            )
+        )
         existing = manifest.existing_ids()
 
         for subj in range(n_subjects):
