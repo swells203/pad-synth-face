@@ -1,0 +1,8 @@
+run:
+  name: defid_poc_setb
+  output: ./datasets/defid_poc_setb
+  seed: 20260516
+ontology_dir: ./ontology/behavioral
+domain: b
+subjects: 12
+sessions_per_subject: 8
