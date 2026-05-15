@@ -1,0 +1,38 @@
+version: "2026-05-15"
+attack_type: touch
+axes:
+  touch_speed_mean:
+    type: uniform
+    low: 200.0
+    high: 1400.0
+    provenance:
+      paper: "Frank et al., 'Touchalytics: On the Applicability of Touchscreen Input as a Behavioral Biometric for Continuous Authentication', IEEE TIFS 2013"
+      doi: "10.1109/TIFS.2012.2225048"
+  touch_speed_std:
+    type: uniform
+    low: 30.0
+    high: 400.0
+    provenance:
+      paper: "Frank et al., Touchalytics, IEEE TIFS 2013 (per-stroke velocity dispersion)"
+      doi: "10.1109/TIFS.2012.2225048"
+  touch_curvature:
+    type: uniform
+    low: 0.01
+    high: 0.35
+    provenance:
+      paper: "Serwadda et al., 'Which Behavioral Biometric Modality is Best for Continuous Authentication?', BTAS 2013"
+      doi: "10.1109/BTAS.2013.6712747"
+  touch_jitter:
+    type: uniform
+    low: 0.5
+    high: 12.0
+    provenance:
+      paper: "Sitová et al., 'HMOG: New Behavioral Biometric Features for Continuous Authentication of Smartphone Users', IEEE TIFS 2016"
+      doi: "10.1109/TIFS.2015.2506542"
+  inter_touch_interval_ms:
+    type: uniform
+    low: 80.0
+    high: 900.0
+    provenance:
+      paper: "Frank et al., Touchalytics, IEEE TIFS 2013 (inter-stroke timing)"
+      doi: "10.1109/TIFS.2012.2225048"

@@ -1,0 +1,31 @@
+version: "2026-05-15"
+attack_type: keystroke
+axes:
+  key_dwell_mean:
+    type: uniform
+    low: 60.0
+    high: 180.0
+    provenance:
+      paper: "Killourhy & Maxion, 'Comparing Anomaly-Detection Algorithms for Keystroke Dynamics', DSN 2009"
+      doi: "10.1109/DSN.2009.5270346"
+  key_dwell_std:
+    type: uniform
+    low: 8.0
+    high: 60.0
+    provenance:
+      paper: "Killourhy & Maxion, DSN 2009 (dwell-time dispersion)"
+      doi: "10.1109/DSN.2009.5270346"
+  key_flight_mean:
+    type: uniform
+    low: 80.0
+    high: 320.0
+    provenance:
+      paper: "Killourhy & Maxion, DSN 2009 (flight-time distribution)"
+      doi: "10.1109/DSN.2009.5270346"
+  key_flight_std:
+    type: uniform
+    low: 15.0
+    high: 140.0
+    provenance:
+      paper: "Killourhy & Maxion, DSN 2009 (flight-time dispersion)"
+      doi: "10.1109/DSN.2009.5270346"
