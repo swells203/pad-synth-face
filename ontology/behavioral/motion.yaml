@@ -1,0 +1,24 @@
+version: "2026-05-15"
+attack_type: motion
+axes:
+  accel_mag_mean:
+    type: uniform
+    low: 9.2
+    high: 10.4
+    provenance:
+      paper: "Sitová et al., HMOG, IEEE TIFS 2016 (resting/holding acceleration magnitude near 1g)"
+      doi: "10.1109/TIFS.2015.2506542"
+  tremor_std:
+    type: uniform
+    low: 0.02
+    high: 0.45
+    provenance:
+      paper: "Sitová et al., HMOG, IEEE TIFS 2016 (micro-tremor while holding device)"
+      doi: "10.1109/TIFS.2015.2506542"
+  motion_touch_coupling:
+    type: uniform
+    low: 0.15
+    high: 0.85
+    provenance:
+      paper: "Bo et al., 'SilentSense: Silent User Identification via Touch and Movement Behavioral Biometrics', MobiCom 2013"
+      doi: "10.1145/2500423.2504572"

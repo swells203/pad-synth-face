@@ -4,6 +4,7 @@ requires-python = ">=3.11"
 
 [manifest]
 members = [
+    "defid",
     "pad-synth-core",
     "pad-synth-face",
 ]
@@ -96,6 +97,32 @@ nvrtc = [
 nvtx = [
     { name = "nvidia-nvtx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
+
+[[package]]
+name = "defid"
+version = "0.1.0"
+source = { editable = "defid-pkg" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pad-synth-core" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.26" },
+    { name = "pad-synth-core", editable = "pad-synth-core" },
+    { name = "pydantic", specifier = ">=2.5" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
+provides-extras = ["test"]
 
 [[package]]
 name = "filelock"
