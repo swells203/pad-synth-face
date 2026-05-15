@@ -40,8 +40,8 @@ defid/
 │   ├── pipeline.py                      # config-driven generation (manifest + provenance)
 │   ├── evaluate.py                      # in-domain + cross-domain proxy eval
 │   └── cli.py                           # `defid generate` / `defid eval`
-│   └── tests/  -> defid/tests/
-├── defid/tests/                         # pytest (importlib mode, no __init__.py)
+│   └── tests/  -> defid-pkg/tests/
+├── defid-pkg/tests/                         # pytest (importlib mode, no __init__.py)
 ontology/behavioral/
 ├── touch.yaml
 ├── keystroke.yaml
@@ -59,13 +59,13 @@ Workspace root `pyproject.toml` adds `defid` to `[tool.uv.workspace] members`.
 
 **Files:**
 - Modify: `pyproject.toml` (workspace members)
-- Create: `defid/pyproject.toml`
-- Create: `defid/src/defid/__init__.py`
-- Create: `defid/tests/test_smoke.py`
+- Create: `defid-pkg/pyproject.toml`
+- Create: `defid-pkg/src/defid/__init__.py`
+- Create: `defid-pkg/tests/test_smoke.py`
 
 - [ ] **Step 1: Write the failing smoke test**
 
-`defid/tests/test_smoke.py`:
+`defid-pkg/tests/test_smoke.py`:
 ```python
 def test_import_defid():
     import defid
@@ -76,7 +76,7 @@ def test_import_defid():
 
 ```bash
 cd /Users/stuartwells/test
-.venv/bin/python -m pytest defid/tests/test_smoke.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_smoke.py -v 2>&1 | tail -10
 ```
 
 Expected: `ModuleNotFoundError: No module named 'defid'`.
@@ -96,7 +96,7 @@ members = ["pad-synth-core", "pad-synth-face", "defid"]
 
 - [ ] **Step 4: Create the package files**
 
-`defid/pyproject.toml`:
+`defid-pkg/pyproject.toml`:
 ```toml
 [build-system]
 requires = ["hatchling"]
@@ -123,7 +123,7 @@ defid = "defid.cli:main"
 pad-synth-core = { workspace = true }
 ```
 
-`defid/src/defid/__init__.py`:
+`defid-pkg/src/defid/__init__.py`:
 ```python
 __version__ = "0.1.0"
 ```
@@ -133,7 +133,7 @@ __version__ = "0.1.0"
 ```bash
 cd /Users/stuartwells/test
 uv sync --all-extras 2>&1 | tail -3
-.venv/bin/python -m pytest defid/tests/test_smoke.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_smoke.py -v 2>&1 | tail -10
 ```
 
 Expected: 1 passed.
@@ -149,7 +149,7 @@ Expected: all prior tests still pass + 1 new.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml defid/pyproject.toml defid/src/defid/__init__.py defid/tests/test_smoke.py
+git add pyproject.toml defid-pkg/pyproject.toml defid-pkg/src/defid/__init__.py defid-pkg/tests/test_smoke.py
 git commit -m "feat(defid): scaffold DefinitiveID package in workspace"
 ```
 
@@ -163,11 +163,11 @@ Three literature-cited ontology files defining the parameter ranges the generato
 - Create: `ontology/behavioral/touch.yaml`
 - Create: `ontology/behavioral/keystroke.yaml`
 - Create: `ontology/behavioral/motion.yaml`
-- Create: `defid/tests/test_ontology_files.py`
+- Create: `defid-pkg/tests/test_ontology_files.py`
 
 - [ ] **Step 1: Write the failing test**
 
-`defid/tests/test_ontology_files.py`:
+`defid-pkg/tests/test_ontology_files.py`:
 ```python
 from pathlib import Path
 
@@ -202,7 +202,7 @@ def test_motion_ontology_loads():
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_ontology_files.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_ontology_files.py -v 2>&1 | tail -10
 ```
 
 Expected: FileNotFoundError.
@@ -318,7 +318,7 @@ axes:
 - [ ] **Step 6: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_ontology_files.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_ontology_files.py -v 2>&1 | tail -10
 ```
 
 Expected: 3 passed.
@@ -326,7 +326,7 @@ Expected: 3 passed.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add ontology/behavioral defid/tests/test_ontology_files.py
+git add ontology/behavioral defid-pkg/tests/test_ontology_files.py
 git commit -m "feat(defid): literature-cited behavioral ontology (touch/keystroke/motion)"
 ```
 
@@ -335,12 +335,12 @@ git commit -m "feat(defid): literature-cited behavioral ontology (touch/keystrok
 ## Task 3: BehavioralSession schema + JSONL manifest writer
 
 **Files:**
-- Create: `defid/src/defid/session.py`
-- Create: `defid/tests/test_session.py`
+- Create: `defid-pkg/src/defid/session.py`
+- Create: `defid-pkg/tests/test_session.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-`defid/tests/test_session.py`:
+`defid-pkg/tests/test_session.py`:
 ```python
 import json
 from pathlib import Path
@@ -405,12 +405,12 @@ def test_manifest_writer_tolerates_partial_line(tmp_path: Path):
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_session.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_session.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `defid.session`.
 
-- [ ] **Step 3: Implement `defid/src/defid/session.py`**
+- [ ] **Step 3: Implement `defid-pkg/src/defid/session.py`**
 
 ```python
 """Behavioral session schema and an append-only JSONL session manifest.
@@ -507,7 +507,7 @@ class SessionManifestWriter:
 - [ ] **Step 4: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_session.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_session.py -v 2>&1 | tail -10
 ```
 
 Expected: 4 passed.
@@ -515,7 +515,7 @@ Expected: 4 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add defid/src/defid/session.py defid/tests/test_session.py
+git add defid-pkg/src/defid/session.py defid-pkg/tests/test_session.py
 git commit -m "feat(defid): behavioral session schema + resumable JSONL manifest"
 ```
 
@@ -526,12 +526,12 @@ git commit -m "feat(defid): behavioral session schema + resumable JSONL manifest
 Deterministically synthesizes a `BehavioralSession` for a given `(label, subject, seed, domain)`. Genuine = a stable per-subject motor profile with natural jitter; imposter = different profile; bot = degenerate jitter, machine-regular timing, no motion-touch coupling. `domain="b"` applies a fixed multiplicative shift to sampled parameters — the synthetic cross-domain proxy (Phase 1.5 precedent).
 
 **Files:**
-- Create: `defid/src/defid/generator.py`
-- Create: `defid/tests/test_generator.py`
+- Create: `defid-pkg/src/defid/generator.py`
+- Create: `defid-pkg/tests/test_generator.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-`defid/tests/test_generator.py`:
+`defid-pkg/tests/test_generator.py`:
 ```python
 from pathlib import Path
 
@@ -596,12 +596,12 @@ def test_domain_b_shifts_distribution():
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_generator.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_generator.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `defid.generator`.
 
-- [ ] **Step 3: Implement `defid/src/defid/generator.py`**
+- [ ] **Step 3: Implement `defid-pkg/src/defid/generator.py`**
 
 ```python
 """Deterministic synthetic behavioral-session generator.
@@ -735,7 +735,7 @@ def generate_session(
 - [ ] **Step 4: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_generator.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_generator.py -v 2>&1 | tail -10
 ```
 
 Expected: 5 passed.
@@ -743,7 +743,7 @@ Expected: 5 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add defid/src/defid/generator.py defid/tests/test_generator.py
+git add defid-pkg/src/defid/generator.py defid-pkg/tests/test_generator.py
 git commit -m "feat(defid): deterministic genuine/imposter/bot session generator"
 ```
 
@@ -752,12 +752,12 @@ git commit -m "feat(defid): deterministic genuine/imposter/bot session generator
 ## Task 5: Per-session behavioral QC
 
 **Files:**
-- Create: `defid/src/defid/qc.py`
-- Create: `defid/tests/test_qc.py`
+- Create: `defid-pkg/src/defid/qc.py`
+- Create: `defid-pkg/tests/test_qc.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-`defid/tests/test_qc.py`:
+`defid-pkg/tests/test_qc.py`:
 ```python
 from pathlib import Path
 
@@ -803,12 +803,12 @@ def test_qc_fails_on_implausible_speed():
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_qc.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_qc.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `defid.qc`.
 
-- [ ] **Step 3: Implement `defid/src/defid/qc.py`**
+- [ ] **Step 3: Implement `defid-pkg/src/defid/qc.py`**
 
 ```python
 """Per-session behavioral-plausibility QC. Cheap, runs inline during
@@ -862,7 +862,7 @@ def check_session(s: BehavioralSession) -> QCResult:
 - [ ] **Step 4: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_qc.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_qc.py -v 2>&1 | tail -10
 ```
 
 Expected: 4 passed.
@@ -870,7 +870,7 @@ Expected: 4 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add defid/src/defid/qc.py defid/tests/test_qc.py
+git add defid-pkg/src/defid/qc.py defid-pkg/tests/test_qc.py
 git commit -m "feat(defid): per-session behavioral-plausibility QC"
 ```
 
@@ -879,12 +879,12 @@ git commit -m "feat(defid): per-session behavioral-plausibility QC"
 ## Task 6: Windowing + feature extraction
 
 **Files:**
-- Create: `defid/src/defid/features.py`
-- Create: `defid/tests/test_features.py`
+- Create: `defid-pkg/src/defid/features.py`
+- Create: `defid-pkg/tests/test_features.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-`defid/tests/test_features.py`:
+`defid-pkg/tests/test_features.py`:
 ```python
 from pathlib import Path
 
@@ -925,12 +925,12 @@ def test_genuine_vs_imposter_differ():
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_features.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_features.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `defid.features`.
 
-- [ ] **Step 3: Implement `defid/src/defid/features.py`**
+- [ ] **Step 3: Implement `defid-pkg/src/defid/features.py`**
 
 ```python
 """Session -> fixed-length feature vector. Versioned feature schema."""
@@ -1023,7 +1023,7 @@ def extract_features(s: BehavioralSession) -> np.ndarray:
 - [ ] **Step 4: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_features.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_features.py -v 2>&1 | tail -10
 ```
 
 Expected: 4 passed.
@@ -1031,7 +1031,7 @@ Expected: 4 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add defid/src/defid/features.py defid/tests/test_features.py
+git add defid-pkg/src/defid/features.py defid-pkg/tests/test_features.py
 git commit -m "feat(defid): windowed feature extraction (versioned schema)"
 ```
 
@@ -1040,12 +1040,12 @@ git commit -m "feat(defid): windowed feature extraction (versioned schema)"
 ## Task 7: Continuous-auth model (Mahalanobis one-class)
 
 **Files:**
-- Create: `defid/src/defid/models.py`
-- Create: `defid/tests/test_models_auth.py`
+- Create: `defid-pkg/src/defid/models.py`
+- Create: `defid-pkg/tests/test_models_auth.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-`defid/tests/test_models_auth.py`:
+`defid-pkg/tests/test_models_auth.py`:
 ```python
 import numpy as np
 
@@ -1084,12 +1084,12 @@ def test_auth_is_deterministic():
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_models_auth.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_models_auth.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `defid.models`.
 
-- [ ] **Step 3: Implement `defid/src/defid/models.py`** (auth class; bot class added in Task 8)
+- [ ] **Step 3: Implement `defid-pkg/src/defid/models.py`** (auth class; bot class added in Task 8)
 
 ```python
 """Pure-numpy PoC models. No torch, deterministic, CPU-instant.
@@ -1137,7 +1137,7 @@ class MahalanobisAuth:
 - [ ] **Step 4: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_models_auth.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_models_auth.py -v 2>&1 | tail -10
 ```
 
 Expected: 3 passed.
@@ -1145,7 +1145,7 @@ Expected: 3 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add defid/src/defid/models.py defid/tests/test_models_auth.py
+git add defid-pkg/src/defid/models.py defid-pkg/tests/test_models_auth.py
 git commit -m "feat(defid): Mahalanobis one-class continuous-auth scorer"
 ```
 
@@ -1154,12 +1154,12 @@ git commit -m "feat(defid): Mahalanobis one-class continuous-auth scorer"
 ## Task 8: Bot classifier (numpy logistic regression)
 
 **Files:**
-- Modify: `defid/src/defid/models.py`
-- Create: `defid/tests/test_models_bot.py`
+- Modify: `defid-pkg/src/defid/models.py`
+- Create: `defid-pkg/tests/test_models_bot.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-`defid/tests/test_models_bot.py`:
+`defid-pkg/tests/test_models_bot.py`:
 ```python
 import numpy as np
 
@@ -1191,12 +1191,12 @@ def test_bot_classifier_is_deterministic():
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_models_bot.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_models_bot.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `LogisticBotClassifier`.
 
-- [ ] **Step 3: Append `LogisticBotClassifier` to `defid/src/defid/models.py`**
+- [ ] **Step 3: Append `LogisticBotClassifier` to `defid-pkg/src/defid/models.py`**
 
 ```python
 class LogisticBotClassifier:
@@ -1244,7 +1244,7 @@ class LogisticBotClassifier:
 - [ ] **Step 4: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_models_bot.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_models_bot.py -v 2>&1 | tail -10
 ```
 
 Expected: 2 passed.
@@ -1252,7 +1252,7 @@ Expected: 2 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add defid/src/defid/models.py defid/tests/test_models_bot.py
+git add defid-pkg/src/defid/models.py defid-pkg/tests/test_models_bot.py
 git commit -m "feat(defid): deterministic logistic-regression bot classifier"
 ```
 
@@ -1261,15 +1261,15 @@ git commit -m "feat(defid): deterministic logistic-regression bot classifier"
 ## Task 9: Generation pipeline + `defid generate` CLI
 
 **Files:**
-- Create: `defid/src/defid/pipeline.py`
-- Create: `defid/src/defid/cli.py`
+- Create: `defid-pkg/src/defid/pipeline.py`
+- Create: `defid-pkg/src/defid/cli.py`
 - Create: `configs/runs/defid_poc_seta.yaml`
 - Create: `configs/runs/defid_poc_setb.yaml`
-- Create: `defid/tests/test_pipeline.py`
+- Create: `defid-pkg/tests/test_pipeline.py`
 
 - [ ] **Step 1: Write the failing test**
 
-`defid/tests/test_pipeline.py`:
+`defid-pkg/tests/test_pipeline.py`:
 ```python
 import json
 from pathlib import Path
@@ -1320,12 +1320,12 @@ def test_generation_is_resumable(tmp_path: Path):
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_pipeline.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_pipeline.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `defid.pipeline`.
 
-- [ ] **Step 3: Implement `defid/src/defid/pipeline.py`**
+- [ ] **Step 3: Implement `defid-pkg/src/defid/pipeline.py`**
 
 ```python
 """Config-driven behavioral-session generation with manifest + provenance."""
@@ -1419,7 +1419,7 @@ def run_generation(config_path: Path) -> dict[str, Any]:
     return {"generated": generated, "failed": failed, "skipped": skipped}
 ```
 
-- [ ] **Step 4: Implement `defid/src/defid/cli.py`** (generate; eval added in Task 10)
+- [ ] **Step 4: Implement `defid-pkg/src/defid/cli.py`** (generate; eval added in Task 10)
 
 ```python
 """DefinitiveID PoC CLI: `defid generate` (eval added in Task 10)."""
@@ -1484,7 +1484,7 @@ sessions_per_subject: 8
 ```bash
 cd /Users/stuartwells/test
 uv sync --all-extras 2>&1 | tail -2
-.venv/bin/python -m pytest defid/tests/test_pipeline.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_pipeline.py -v 2>&1 | tail -10
 ```
 
 Expected: 2 passed.
@@ -1492,7 +1492,7 @@ Expected: 2 passed.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add defid/src/defid/pipeline.py defid/src/defid/cli.py configs/runs/defid_poc_seta.yaml configs/runs/defid_poc_setb.yaml defid/tests/test_pipeline.py
+git add defid-pkg/src/defid/pipeline.py defid-pkg/src/defid/cli.py configs/runs/defid_poc_seta.yaml configs/runs/defid_poc_setb.yaml defid-pkg/tests/test_pipeline.py
 git commit -m "feat(defid): generation pipeline + generate CLI + PoC configs"
 ```
 
@@ -1501,13 +1501,13 @@ git commit -m "feat(defid): generation pipeline + generate CLI + PoC configs"
 ## Task 10: Evaluation + cross-domain proxy + `defid eval`
 
 **Files:**
-- Create: `defid/src/defid/evaluate.py`
-- Modify: `defid/src/defid/cli.py`
-- Create: `defid/tests/test_evaluate.py`
+- Create: `defid-pkg/src/defid/evaluate.py`
+- Modify: `defid-pkg/src/defid/cli.py`
+- Create: `defid-pkg/tests/test_evaluate.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-`defid/tests/test_evaluate.py`:
+`defid-pkg/tests/test_evaluate.py`:
 ```python
 import json
 import subprocess
@@ -1569,12 +1569,12 @@ def test_cli_eval_runs(tmp_path: Path):
 - [ ] **Step 2: Verify failure**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_evaluate.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_evaluate.py -v 2>&1 | tail -10
 ```
 
 Expected: ImportError on `defid.evaluate`.
 
-- [ ] **Step 3: Implement `defid/src/defid/evaluate.py`**
+- [ ] **Step 3: Implement `defid-pkg/src/defid/evaluate.py`**
 
 ```python
 """Train on a generated session set; evaluate continuous-auth EER and bot
@@ -1648,7 +1648,7 @@ def evaluate(train_root: Path, eval_root: Path | None) -> dict[str, Any]:
     return result
 ```
 
-- [ ] **Step 4: Add the `eval` subcommand to `defid/src/defid/cli.py`**
+- [ ] **Step 4: Add the `eval` subcommand to `defid-pkg/src/defid/cli.py`**
 
 Replace the file with:
 ```python
@@ -1701,7 +1701,7 @@ if __name__ == "__main__":
 - [ ] **Step 5: Verify pass**
 
 ```bash
-.venv/bin/python -m pytest defid/tests/test_evaluate.py -v 2>&1 | tail -10
+.venv/bin/python -m pytest defid-pkg/tests/test_evaluate.py -v 2>&1 | tail -10
 ```
 
 Expected: 3 passed.
@@ -1709,7 +1709,7 @@ Expected: 3 passed.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add defid/src/defid/evaluate.py defid/src/defid/cli.py defid/tests/test_evaluate.py
+git add defid-pkg/src/defid/evaluate.py defid-pkg/src/defid/cli.py defid-pkg/tests/test_evaluate.py
 git commit -m "feat(defid): in-domain + cross-domain eval and eval CLI"
 ```
 
@@ -1718,11 +1718,11 @@ git commit -m "feat(defid): in-domain + cross-domain eval and eval CLI"
 ## Task 11: End-to-end PoC integration test + decision readout
 
 **Files:**
-- Create: `defid/tests/test_poc_integration.py`
+- Create: `defid-pkg/tests/test_poc_integration.py`
 
 - [ ] **Step 1: Write the integration test**
 
-`defid/tests/test_poc_integration.py`:
+`defid-pkg/tests/test_poc_integration.py`:
 ```python
 import json
 import subprocess
@@ -1780,7 +1780,7 @@ def test_poc_end_to_end(tmp_path: Path):
 
 ```bash
 cd /Users/stuartwells/test
-.venv/bin/python -m pytest defid/tests/test_poc_integration.py -v 2>&1 | tail -15
+.venv/bin/python -m pytest defid-pkg/tests/test_poc_integration.py -v 2>&1 | tail -15
 ```
 
 Expected: 1 passed.
@@ -1796,7 +1796,7 @@ Expected: all tests pass (existing PAD suite + all new `defid` tests).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add defid/tests/test_poc_integration.py
+git add defid-pkg/tests/test_poc_integration.py
 git commit -m "test(defid): end-to-end PoC integration (generate + cross-domain eval)"
 ```
 
