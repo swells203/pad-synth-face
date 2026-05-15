@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "defid"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pad-synth-core",
+    "numpy>=1.26",
+    "pydantic>=2.5",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+defid = "defid.cli:main"
+
+[tool.uv.sources]
+pad-synth-core = { workspace = true }
