@@ -32,6 +32,7 @@ def test_generation_produces_manifest_and_payloads(tmp_path: Path):
     assert (out / first["payload_path"]).exists()
     prov = (out / "provenance.jsonl").read_text()
     assert "ontology_citation" in prov
+    assert "bonafide_dataset_ingested" in prov
 
 
 def test_generation_is_resumable(tmp_path: Path):

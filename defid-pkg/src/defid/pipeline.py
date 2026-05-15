@@ -71,7 +71,8 @@ def run_generation(config_path: Path) -> dict[str, Any]:
                         skipped += 1
                         continue
                     s = generate_session(
-                        label, subject_id, seed=master_seed * 1000 + sess,
+                        label, subject_id,
+                        seed=master_seed * 1000 + subj * n_sessions + sess,
                         ontology_dir=ontology_dir, domain=domain,
                     )
                     s.session_id = sid
