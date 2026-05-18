@@ -913,26 +913,35 @@ Thin HTTP shell over `DemoService` (one global instance) + static capture/Dashbo
 
 - [ ] **Step 1: Write the failing test**
 
+> **Plan correction (applied during execution):** an earlier draft used a
+> deterministic `_rep(speed, dwell)` with no per-rep variation. That yields
+> 8 identical enrollment reps → zero-variance feature columns → the
+> `DemoAuth.fit` all-constant guard correctly rejects it. The smoke test
+> must use varied synthetic reps (a seeded RNG with jitter), exactly as the
+> Task 6 `test_service_flow.py` helper does. The corrected version below is
+> what was built.
+
 `defid-demo-pkg/tests/test_app_smoke.py`:
 ```python
+import numpy as np
 from fastapi.testclient import TestClient
 
 from defid_demo.app import app
 
 
-def _rep(speed, dwell):
+def _rep(rng, speed, dwell):
     ptr, ts, x, y = [], 1000.0, 50.0, 50.0
     for i in range(45):
-        x += speed
-        y += speed * 0.4
-        ts += 16.0
+        x += speed + rng.normal(0, 0.4)
+        y += speed * 0.4 + rng.normal(0, 0.4)
+        ts += 16.0 + rng.normal(0, 2.0)
         ptr.append({"x": x, "y": y, "ts": ts})
     keys, kt = [], 3000.0
     for i in range(8):
         keys.append({"code": f"K{i}", "phase": "down", "ts": kt})
         kt += dwell * 1000.0
         keys.append({"code": f"K{i}", "phase": "up", "ts": kt})
-        kt += 180.0
+        kt += 180.0 + rng.normal(0, 20.0)
     return {"pointer": ptr, "keys": keys}
 
 
@@ -945,13 +954,14 @@ def test_index_and_spectator_served():
 
 def test_reset_enroll_calibrate_attempt_roundtrip():
     c = TestClient(app)
+    rng = np.random.default_rng(7)
     assert c.post("/api/reset").status_code == 200
     for _ in range(8):
-        r = c.post("/api/enroll", json=_rep(2.0, 0.09))
+        r = c.post("/api/enroll", json=_rep(rng, 2.0, 0.09))
         assert r.status_code == 200 and r.json()["ok"]
     cal = c.post("/api/calibrate").json()
     assert cal["ok"] and cal["threshold"] > 0
-    a = c.post("/api/attempt", json=_rep(2.0, 0.09)).json()
+    a = c.post("/api/attempt", json=_rep(rng, 2.0, 0.09)).json()
     assert a["verdict"] in ("ACCEPT", "REJECT")
     assert "distances" in a
     assert len(a["feature_values"]) == 9
