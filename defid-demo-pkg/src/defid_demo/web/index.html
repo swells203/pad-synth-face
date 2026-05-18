@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>DefinitiveID — Live Demo</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;background:#0f1419;color:#e6e6e6}
+  header{padding:12px 16px;background:#161b22;font-weight:700}
+  .wrap{display:flex;flex-wrap:wrap}
+  .left,.right{flex:1;min-width:300px;padding:16px}
+  #pad{width:100%;height:240px;background:#1c2330;border:1px solid #30363d;border-radius:8px;touch-action:none}
+  input,button{font-size:16px;padding:10px;margin:6px 0;width:100%;box-sizing:border-box}
+  button{background:#2f81f7;color:#fff;border:0;border-radius:6px;font-weight:700}
+  button.alt{background:#30363d}
+  #verdict{font-size:34px;font-weight:800;text-align:center;margin:12px 0}
+  .ACCEPT{color:#3fb950}.REJECT{color:#f85149}
+  #gauge{height:18px;background:#30363d;border-radius:9px;overflow:hidden}
+  #gfill{height:100%;width:0;background:#f85149}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td{border-bottom:1px solid #30363d;padding:3px 6px}
+  #scatter{height:160px;border:1px solid #30363d;border-radius:8px;position:relative;background:#1c2330}
+  .pt{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%)}
+  .g{background:#3fb950}.i{background:#f85149}
+  .thr{position:absolute;left:0;right:0;border-top:2px dashed #d29922}
+  small{color:#8b949e}
+</style>
+</head>
+<body>
+<header>DefinitiveID — Live Behavioral Demo</header>
+<div class="wrap">
+  <div class="left">
+    <p><small id="phase">Phase: enroll. Swipe on the pad, then type the passphrase, then tap the action.</small></p>
+    <canvas id="pad"></canvas>
+    <input id="pass" placeholder="type: definitive identity" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="go">Submit enrollment rep (<span id="cnt">0</span>/8)</button>
+    <button id="cal" class="alt">Calibrate</button>
+    <button id="att" class="alt">Submit attempt</button>
+    <button id="rst" class="alt">Reset demo</button>
+    <div id="verdict"></div>
+    <div id="gauge"><div id="gfill"></div></div>
+    <small id="dist"></small>
+  </div>
+  <div class="right">
+    <p><small>Attempt history — genuine below the line, impostor above.</small></p>
+    <div id="scatter"><div class="thr" id="thrline" style="top:50%"></div></div>
+    <p><small>Live feature vector (most recent attempt)</small></p>
+    <table id="ftab"></table>
+    <small id="dropped"></small>
+  </div>
+</div>
+<script>
+const pad=document.getElementById('pad'),ctx=pad.getContext('2d');
+function fit(){pad.width=pad.clientWidth;pad.height=pad.clientHeight;}
+window.addEventListener('resize',fit);fit();
+let pointer=[],keys=[],drawing=false;
+function clearPad(){pointer=[];ctx.clearRect(0,0,pad.width,pad.height);}
+pad.addEventListener('pointerdown',e=>{drawing=true;ctx.beginPath();ctx.moveTo(e.offsetX,e.offsetY);});
+pad.addEventListener('pointermove',e=>{
+  if(!drawing)return;
+  pointer.push({x:e.clientX,y:e.clientY,ts:e.timeStamp});
+  ctx.lineTo(e.offsetX,e.offsetY);ctx.strokeStyle='#2f81f7';ctx.lineWidth=3;ctx.stroke();
+});
+window.addEventListener('pointerup',()=>{drawing=false;});
+const pf=document.getElementById('pass');
+pf.addEventListener('keydown',e=>keys.push({code:e.code,phase:'down',ts:e.timeStamp}));
+pf.addEventListener('keyup',e=>keys.push({code:e.code,phase:'up',ts:e.timeStamp}));
+function rep(){const r={pointer:pointer.slice(),keys:keys.slice()};clearPad();keys=[];pf.value='';return r;}
+async function post(u,b){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):null});return r.json();}
+let cnt=0;
+document.getElementById('go').onclick=async()=>{
+  const o=await post('/api/enroll',rep());
+  if(!o.ok){alert(o.reason);return;}
+  cnt=o.enroll_reps;document.getElementById('cnt').textContent=cnt;
+};
+document.getElementById('cal').onclick=async()=>{
+  const o=await post('/api/calibrate');
+  if(!o.ok){alert(o.reason);return;}
+  document.getElementById('phase').textContent='Phase: attempt. Threshold set ('+o.threshold.toFixed(2)+').';
+  document.getElementById('dropped').textContent=o.dropped.length?('dropped constant features: '+o.dropped.join(', ')):'';
+};
+function render(o){
+  const v=document.getElementById('verdict');
+  v.textContent=o.verdict;v.className=o.verdict;
+  const mx=o.threshold*2.2,avg=o.distances.reduce((a,b)=>a+b,0)/o.distances.length;
+  document.getElementById('gfill').style.width=Math.min(100,avg/mx*100)+'%';
+  document.getElementById('dist').textContent='mean dist '+avg.toFixed(2)+'  vs  thr '+o.threshold.toFixed(2);
+  const sc=document.getElementById('scatter');
+  document.getElementById('thrline').style.top='50%';
+  o.distances.forEach(d=>{
+    const p=document.createElement('div');
+    p.className='pt '+(o.verdict==='ACCEPT'?'g':'i');
+    p.style.left=(10+Math.random()*80)+'%';
+    p.style.top=Math.max(2,Math.min(98,50-(d-o.threshold)/(o.threshold||1)*25))+'%';
+    sc.appendChild(p);
+  });
+  const t=document.getElementById('ftab');t.innerHTML='';
+  Object.entries(o.feature_values).forEach(([n,val])=>{
+    t.innerHTML+='<tr><td>'+n+'</td><td>'+val.toFixed(4)+'</td></tr>';
+  });
+}
+document.getElementById('att').onclick=async()=>{
+  const o=await post('/api/attempt',rep());
+  if(!o.ok){alert(o.reason);return;}
+  render(o);
+};
+document.getElementById('rst').onclick=async()=>{await post('/api/reset');cnt=0;document.getElementById('cnt').textContent='0';location.reload();};
+</script>
+</body>
+</html>

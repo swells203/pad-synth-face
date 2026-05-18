@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><title>DefinitiveID — Spectator</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#0f1419;color:#e6e6e6;margin:0;padding:24px}
+  h1{font-size:20px}#v{font-size:64px;font-weight:800;text-align:center;margin:24px}
+  .ACCEPT{color:#3fb950}.REJECT{color:#f85149}
+  table{width:100%;border-collapse:collapse}td{border-bottom:1px solid #30363d;padding:6px}
+  small{color:#8b949e}
+</style>
+</head>
+<body>
+<h1>DefinitiveID — live (read-only)</h1>
+<div id="v">—</div>
+<p style="text-align:center"><small id="meta"></small></p>
+<table id="t"></table>
+<script>
+async function tick(){
+  const s=await (await fetch('/api/state')).json();
+  const last=s.attempts[s.attempts.length-1];
+  const v=document.getElementById('v');
+  if(last){v.textContent=last.verdict;v.className=last.verdict;
+    document.getElementById('meta').textContent='threshold '+(s.threshold||0).toFixed(2)+' · attempts '+s.attempts.length;}
+  const t=document.getElementById('t');t.innerHTML='';
+  s.attempts.slice(-10).forEach((a,i)=>{t.innerHTML+='<tr><td>#'+(s.attempts.length-10+i+1)+'</td><td class="'+a.verdict+'">'+a.verdict+'</td><td>frac_above '+a.frac_above.toFixed(2)+'</td></tr>';});
+}
+setInterval(tick,1000);tick();
+</script>
+</body>
+</html>
