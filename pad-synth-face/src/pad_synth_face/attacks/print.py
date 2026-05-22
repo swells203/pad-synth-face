@@ -3,7 +3,9 @@
 Pipeline:
   1. Paper-color tint (matte/glossy/photo per ontology)
   2. Halftone — per-channel AM dot screening at standard rosette angles
-     (C=15°, M=75°, Y=0°, K=45°); dot-cell frequency driven by print_dpi.
+     (C=15°, M=75°, Y=0°, K=45°); dot-cell frequency driven by print_dpi
+     with per-sample jitter on cell-size (±10%), angle (σ=3°), and
+     sub-pixel offset to break deterministic-pattern artifacts (v2.1).
   3. ICC profile transform — gamut compression + white-point shift +
      tone gamma, parameterized per paper_type and scaled by
      icc_profile_strength.
@@ -13,7 +15,9 @@ Pipeline:
 
 Anisotropic specular highlights remain explicitly deferred to a follow-up.
 The v1 single-tier-physics version is captured by ontology_version
-2026-05-11; this module corresponds to ontology_version 2026-05-22.
+2026-05-11; the v2 deterministic-halftone version by 2026-05-22; this
+module (v2.1, jittered halftone) corresponds to ontology_version
+2026-05-23.
 """
 
 from __future__ import annotations
@@ -226,8 +230,8 @@ class PrintAttack:
         tint = np.array(_PAPER_TINTS[params["paper_type"]], dtype=np.float32)
         img = img * tint
 
-        # v2: halftone (driven by print_dpi).
-        img = _apply_halftone(img, params["print_dpi"])
+        # v2.1: halftone with per-sample jitter (driven by print_dpi + rng).
+        img = _apply_halftone(img, params["print_dpi"], rng)
 
         # v2: ICC profile (keyed by paper_type, scaled by strength).
         img = _apply_icc(
