@@ -64,7 +64,7 @@ Each cell trains on Set A at its data level and evaluates twice via the existing
 - **In-domain EER** — held-out 25% split from Set A. Comparable to the Phase 1 metric (0.29 in-domain).
 - **Cross-domain EER** — entire Set B at the matching data level. Comparable to the Phase 1.5 metric (0.36 cross-domain).
 
-Training hyperparameters are held constant across all cells (Adam lr=1e-3, CrossEntropyLoss, 8 epochs, batch_size = 32). The experiment isolates capacity × data; hyperparameter tuning is out of scope (§8). The existing `train_and_cross_domain_eval` already returns both EERs in one call.
+Training hyperparameters are held constant across all cells: Adam lr=1e-3, CrossEntropyLoss, **10 epochs** (matches the published Phase 1.5 baseline that produced the 0.36 cross-domain number), batch_size = 32. The experiment isolates capacity × data; hyperparameter tuning is out of scope (§8). The existing `train_and_cross_domain_eval` already returns both EERs in one call.
 
 ### 3.3 GPU placement
 
