@@ -127,6 +127,42 @@ def _apply_halftone(rgb: np.ndarray, print_dpi: int | float) -> np.ndarray:
     return _inv_cmyk(out)
 
 
+# --- v2 physics: ICC profile simulation ---------------------------------------
+
+# Per-paper-type tuple: (gamut_compression, (Δx, Δy) white-point shift, tone_gamma).
+# Parameters per spec §4.1; references: Lukac & Plataniotis (eds.), 2007;
+# Marini & Rizzi 2000 (white-point handling).
+_ICC_PARAMS: dict[str, tuple[float, tuple[float, float], float]] = {
+    "matte":  (0.12, (+0.012, +0.008), 1.10),
+    "glossy": (0.05, (+0.002, +0.001), 0.95),
+    "photo":  (0.03, (-0.003, -0.002), 0.92),
+}
+
+
+def _apply_icc(rgb: np.ndarray, paper_type: str, strength: float) -> np.ndarray:
+    """sRGB-space parameterized print-profile transform.
+
+    rgb: float [0,1] (H,W,3); paper_type in {matte, glossy, photo};
+    strength scales the gamut-compression effect [0,1]. Returns float [0,1].
+    """
+    gamut, (dx, dy), gamma = _ICC_PARAMS[paper_type]
+    out = rgb.astype(np.float32, copy=True)
+
+    # 1. Gamut compression: pull every pixel toward middle gray by c.
+    c = float(gamut) * float(strength)
+    out = (1.0 - c) * out + c * 0.5
+
+    # 2. White-point shift: chromaticity-to-RGB approximation (clipped later).
+    out[..., 0] += float(dx) * 0.5
+    out[..., 1] += float(dy) * 0.5
+    out[..., 2] -= (float(dx) + float(dy)) * 0.25
+
+    # 3. Tone curve: out := out ** (1/gamma).
+    out = np.clip(out, 0.0, 1.0) ** (1.0 / float(gamma))
+
+    return out.astype(np.float32)
+
+
 class PrintAttack:
     name = "print"
 
