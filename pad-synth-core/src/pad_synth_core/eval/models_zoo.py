@@ -13,16 +13,16 @@ from torchvision.models import resnet18
 
 
 def make_tiny_cnn() -> nn.Module:
-    """The Phase-1 baseline (kept here for sweep symmetry). <1 000 params."""
+    """The Phase-1 baseline (kept here for sweep symmetry)."""
     return nn.Sequential(
-        nn.Conv2d(3, 4, 3, padding=1),
+        nn.Conv2d(3, 8, 3, padding=1),
         nn.ReLU(),
         nn.MaxPool2d(2),
-        nn.Conv2d(4, 8, 3, padding=1),
+        nn.Conv2d(8, 16, 3, padding=1),
         nn.ReLU(),
         nn.AdaptiveAvgPool2d(1),
         nn.Flatten(),
-        nn.Linear(8, 2),
+        nn.Linear(16, 2),
     )
 
 

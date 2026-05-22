@@ -20,10 +20,16 @@ def test_factories_exposed():
 
 
 def test_tiny_cnn_shape_and_size():
+    """L1 must match pad_synth_core.eval.baseline.TinyCNN exactly (channels 3->8->16)."""
     m = make_tiny_cnn()
     out = m(torch.zeros(2, 3, 64, 64))
     assert out.shape == (2, 2)
-    assert _param_count(m) < 1_000  # the floor — truly tiny
+    assert _param_count(m) < 2_000  # the floor — matches baseline.TinyCNN (~1.4k params)
+    # Architecture lock: conv1 must be Conv2d(3,8,...) and conv2 Conv2d(8,16,...).
+    convs = [m_ for m_ in m.modules() if isinstance(m_, torch.nn.Conv2d)]
+    assert len(convs) == 2
+    assert (convs[0].in_channels, convs[0].out_channels) == (3, 8)
+    assert (convs[1].in_channels, convs[1].out_channels) == (8, 16)
 
 
 def test_small_cnn_shape_and_size():
