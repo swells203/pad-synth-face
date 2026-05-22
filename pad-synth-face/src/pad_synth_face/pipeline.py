@@ -75,7 +75,15 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
     if deterministic:
         _set_global_determinism(cfg["run"]["seed"])
 
-    loader = DigiFaceLoader(Path(cfg["bonafide"]["root"]))
+    _bonafide_cfg = cfg["bonafide"]
+    if "identities_file" in _bonafide_cfg:
+        _ids_path = Path(_bonafide_cfg["identities_file"])
+        _restrict = [
+            line.strip() for line in _ids_path.read_text().splitlines() if line.strip()
+        ]
+        loader = DigiFaceLoader(Path(_bonafide_cfg["root"]), restrict_to=_restrict)
+    else:
+        loader = DigiFaceLoader(Path(_bonafide_cfg["root"]))
     bonafide_ids = loader.list_identities()
 
     # Compute identity-disjoint splits. Default ratios if not in config.
@@ -97,6 +105,11 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
         name: _ATTACK_REGISTRY[name](load_ontology(Path(spec["ontology"])))
         for name, spec in cfg["attacks"].items()
     }
+    # Single canonical ontology_version for all sample records in this run.
+    # Bonafide records share the print attack's version since bonafide has
+    # no attack ontology of its own; the print ontology is the dominant
+    # version-tracked component of the dataset.
+    _ontology_version = attack_modules["print"].ontology.version
     sensor_preset = _SENSOR_REGISTRY[cfg["sensor_preset"]]
 
     items = enumerate_work_items(
@@ -178,7 +191,7 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
                     sensor_params=sensor_params,
                     pipeline_version=f"pad-synth-face@{pad_synth_face.__version__}",
                     core_version=f"pad-synth-core@{pad_synth_core.__version__}",
-                    ontology_version="2026-05-11",
+                    ontology_version=_ontology_version,
                     seed=bonafide_seed,
                     output_path=out_rel,
                     output_sha256=sha,
@@ -235,7 +248,7 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
                 sensor_params=sensor_params,
                 pipeline_version=f"pad-synth-face@{pad_synth_face.__version__}",
                 core_version=f"pad-synth-core@{pad_synth_core.__version__}",
-                ontology_version="2026-05-11",
+                ontology_version=_ontology_version,
                 seed=it.seed,
                 output_path=out_path_rel,
                 output_sha256=sha,
