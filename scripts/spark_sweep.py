@@ -25,7 +25,7 @@ sys.path.insert(0, str(REPO / "pad-synth-core" / "src"))
 from pad_synth_core.eval.baseline import train_and_cross_domain_eval  # noqa: E402
 from pad_synth_core.eval.models_zoo import FACTORIES  # noqa: E402
 
-DATA_LEVELS = ("D1", "D2", "D3")
+DATA_LEVELS = ("D1", "D2", "D3", "D4")
 CAPACITIES = ("L1", "L2", "L3")
 SEEDS = (0, 1, 2)
 
