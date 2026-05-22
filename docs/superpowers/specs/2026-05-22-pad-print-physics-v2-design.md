@@ -61,7 +61,7 @@ The whole §4 transform operates in **sRGB float [0, 1]** — the parameter valu
 
 1. **Gamut compression**: `rgb_out = (1 − c) · rgb_in + c · 0.5` where `c = gamut_compression × icc_profile_strength` (the strength axis from §5 scales the effect 0.5–1.0×).
 2. **White-point shift** modeled as a small additive bias in sRGB: `rgb += (Δx · 0.5, Δy · 0.5, −(Δx + Δy) · 0.25)` (rough chromaticity-to-RGB approximation; clipped to [0, 1]).
-3. **Tone curve** as a power: `rgb = rgb ** tone_gamma`.
+3. **Tone curve** (decode convention): `rgb = rgb ** (1.0 / tone_gamma)`. Under this convention, `tone_gamma > 1` brightens overall (e.g. matte's 1.10 lifts midtones), `tone_gamma < 1` darkens. Chosen so the qualitative labels in the table above are internally consistent with the chromaticity-shift direction (matte ends up warmer and slightly lifted; photo ends up cooler and slightly darker), matching the test invariants in `pad-synth-face/tests/test_print_icc.py`.
 
 The 3×3 matrix path is intentionally avoided in favor of the 3-parameter scalar tuple per paper_type — it's the smallest physics-defensible parameter set that captures gamut, white point, and tone independently. Adding a full matrix is a YAGNI follow-up if a future audit shows missing fidelity.
 
