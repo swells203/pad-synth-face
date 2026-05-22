@@ -1,0 +1,26 @@
+run:
+  name: real_seta_d3
+  output: ./datasets/real_seta_d3
+  seed: 20260522
+  deterministic: true
+
+modality: face
+
+bonafide:
+  root: ./datasets/_real/digiface_118k_64
+  samples_per_bonafide: 256
+  identities_file: ./configs/digiface_identities_seta.txt
+  splits:
+    train: 0.0
+    dev: 0.0
+    test: 1.0
+
+attacks:
+  print:
+    weight: 1.0
+    ontology: ./ontology/face/print.yaml
+  replay:
+    weight: 1.0
+    ontology: ./ontology/face/replay.yaml
+
+sensor_preset: mobile-front-2024
