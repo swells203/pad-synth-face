@@ -14,12 +14,15 @@ fi
 
 cd "$PROJECT_DIR"
 
+# uv installer puts the binary in ~/.local/bin, which non-interactive SSH
+# sessions don't have on PATH by default. Export unconditionally so both
+# first-install and re-run paths work.
+export PATH="$HOME/.local/bin:$PATH"
+
 # 1) uv (skip if already installed)
 if ! command -v uv >/dev/null 2>&1; then
   echo "Installing uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  # The installer adds ~/.local/bin to PATH for new shells; export for this one.
-  export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # 2) Venv (skip if already created)
@@ -34,6 +37,11 @@ uv pip install --upgrade \
   torch torchvision
 
 uv pip install --upgrade numpy pillow pyyaml pytest
+
+# 3.5) Install the two PAD workspace packages editable. This pulls in their
+#      own deps (pydantic, opencv-python) and makes `pad_synth_core` /
+#      `pad_synth_face` importable for pytest collection.
+uv pip install -e pad-synth-core -e pad-synth-face
 
 # 4) Freeze the resolved versions for reproducibility (one-shot snapshot;
 #    re-runs overwrite to reflect the latest nightly).
