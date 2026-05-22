@@ -14,4 +14,4 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
-eval = ["torch>=2.2"]
+eval = ["torch>=2.2", "torchvision>=0.17"]

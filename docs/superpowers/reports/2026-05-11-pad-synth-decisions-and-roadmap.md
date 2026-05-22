@@ -301,3 +301,10 @@ Tactical guidance for whoever picks this up:
 - **"Should I commit this to main?"** — Only if tests pass on the merged result. The Phase 1 closure used a feature branch + verified-merge + delete-branch flow; preserve that hygiene.
 
 This is a living document. Update it when Phase 1.5 runs, Phase 2 ships, or any strategic decision changes.
+
+
+---
+
+## 2026-05-22 update — Spark scaling sweep
+
+The Phase 1.5 open question (capacity- / data- / physics-limited) has been disambiguated by a 3×3×3 sweep on the DGX Spark. **Diagnosis: data-limited.** More data drops cross-domain EER by 0.12–0.17 at every capacity tier; bigger models help only at intermediate data scales (D2) and stop helping at D3. Phase 2 should promote generation-scale to a first-class deliverable while keeping the physics improvements; deprioritize model architecture upgrades. See [`2026-05-22-pad-spark-sweep-results.md`](./2026-05-22-pad-spark-sweep-results.md) for the heatmaps and the updated Phase 2 recommendation.
