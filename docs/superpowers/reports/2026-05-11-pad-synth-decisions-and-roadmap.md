@@ -322,3 +322,10 @@ The data-limited diagnosis was extended with a D4 tier (Set A = 16k, Set B = 32k
 ## 2026-05-22 update — v2 print physics sweep (artifact found)
 
 Print attack upgraded to v2 (halftoning + ICC). 27-cell v1-vs-v2 sweep at D1–D3 numerically fires across all cells (Δ +0.156 to +0.250 cross-domain), BUT 6/9 cells hit exactly 0.000 EER both in-domain and cross-domain — diagnostic signature of a **generator-fingerprint artifact**: the deterministic halftone screen creates an identical watermark in Set A and Set B that the detector trivially learns. v2-as-implemented should NOT ship as production training data. Next iteration v2.1 needs halftone jitter (random sub-pixel offsets, jittered angles, varied dot shapes). Mask attack module still planned independently. Real-data integration rises in priority. See [`2026-05-22-pad-spark-sweep-results.md`](./2026-05-22-pad-spark-sweep-results.md) §"v2 print physics result" for details.
+
+
+---
+
+## 2026-05-22 update — v2.1 jittered-halftone sweep
+
+v2.1 added per-sample geometric jitter to halftoning to break the v2 deterministic-screen watermark. 27-cell D1–D3 sweep. **Watermark verdict: SURVIVED — 6/9 cells still hit 0.000 cross-domain EER.** The byte-level pattern was broken (confirmed via same-DPI sample sha256 comparison), but the detector latches onto the higher-level **binary-threshold color palette artifact** — each pixel takes one of ~16 quantized colors regardless of dot placement, and this signature is identical across Set A and Set B. v2.1 retains a real ~0.15–0.25 cross-domain improvement at small scales (D1, L1·D2) where the artifact doesn't dominate, confirming physics contributes when not overwhelmed. Phase 2 prioritization update: **real-data integration moves up significantly**; v2.2 (gray-level halftoning) is a possible synthetic-physics next iteration but pure-synthetic halftoning likely produces a learnable palette signature at production scales. See [`2026-05-22-pad-spark-sweep-results.md`](./2026-05-22-pad-spark-sweep-results.md) §"v2.1 result" for the three-way table and details.

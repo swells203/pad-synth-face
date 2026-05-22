@@ -203,3 +203,60 @@ While verifying v2 manifests, found that `pad-synth-face/src/pad_synth_face/pipe
 
 - v2 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_v2/`](./2026-05-22-pad-spark-sweep-results/runs_v2/) (27 files)
 - v2 summary CSV: [`./2026-05-22-pad-spark-sweep-results/summary_v2.csv`](./2026-05-22-pad-spark-sweep-results/summary_v2.csv)
+
+---
+
+## 2026-05-22 update — v2.1 result (halftone jitter; watermark survived)
+
+The v2 result diagnosed a generator-fingerprint artifact in the deterministic halftone. v2.1 added per-channel per-sample jitter to break it — sub-pixel screen offset, angle (σ=3°), cell-size (±10%). Ontology bumped to `2026-05-23`. Same 27-cell Spark sweep at D1–D3. Code SHA at sweep time: `bc856f1`. Torch: `2.12.0.dev20260407+cu128`.
+
+**Pre-sweep sanity check (byte-level watermark):** in `datasets/v21_seta_d3/`, two print samples with the same `print_dpi` produce **byte-different** outputs (`d77a13c8...` vs `459a655c...`). Geometric jitter is taking effect.
+
+**Three-way cross-domain EER comparison (mean ± std):**
+
+| Cell | v1 | v2 | v2.1 |
+|---|---|---|---|
+| L1·D1 | 0.396 ± 0.033 | 0.240 ± 0.070 | 0.245 ± 0.080 |
+| L1·D2 | 0.441 ± 0.029 | 0.240 ± 0.050 | 0.230 ± 0.057 |
+| L1·D3 | 0.228 ± 0.022 | **0.000 ± 0.000** | **0.000 ± 0.000** |
+| L2·D1 | 0.354 ± 0.070 | 0.130 ± 0.059 | 0.130 ± 0.063 |
+| L2·D2 | 0.214 ± 0.005 | **0.000 ± 0.000** | **0.000 ± 0.000** |
+| L2·D3 | 0.217 ± 0.033 | **0.000 ± 0.000** | **0.000 ± 0.000** |
+| L3·D1 | 0.370 ± 0.024 | 0.120 ± 0.153 | 0.109 ± 0.109 |
+| L3·D2 | 0.242 ± 0.017 | **0.000 ± 0.000** | **0.000 ± 0.000** |
+| L3·D3 | 0.249 ± 0.007 | **0.000 ± 0.000** | **0.000 ± 0.000** |
+
+**v2.1 in-domain EER** (mean ± std):
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| L1 | 0.374 ± 0.145 | 0.195 ± 0.062 | 0.012 ± 0.005 |
+| L2 | 0.181 ± 0.104 | **0.000 ± 0.000** | **0.000 ± 0.000** |
+| L3 | 0.140 ± 0.048 | **0.000 ± 0.000** | **0.000 ± 0.000** |
+
+### Watermark verdict: SURVIVED
+
+The spec §10 criterion ("no v2.1 cross-domain cell ≤ 0.001") **fails**: 6/9 cells still hit exactly 0.000. The same 6 cells that hit 0.000 in v2 also hit 0.000 in v2.1, with byte-identical "perfect classifier" signatures. In-domain numbers show the underlying memorization: at L2·D2+ and L3·D2+, models reach 0.000 in-domain too — perfect Set A memorization, perfect Set B transfer.
+
+But the byte-level watermark **was** broken by the jitter (T6 sanity check: same-DPI samples have different sha256 hashes). Combined with the surviving cross-domain EER artifact, this means the detector is latching onto something **higher-level** than the exact dot pattern.
+
+### Diagnosis: the binary halftone threshold is the deeper artifact
+
+Geometric jitter (offset, angle, cell-size) varies *where* the dots are placed. It does not change the *output color palette*. Both v2 and v2.1 use the same binary-threshold step (`(channel > screen).astype(float32)`) per CMYK channel, recombined to RGB. The result is a heavily-quantized color space — each pixel takes one of at most 2⁴ = 16 colors after `_inv_cmyk`. Real bonafide images have a continuous color distribution; halftoned images have this characteristic 16-color palette. The detector learns this distinction trivially, and the distinction is identical between Set A and Set B regardless of dot placement.
+
+Evidence:
+- Cells where the artifact dominates (D2+ for L2, L3; D3 for L1) hit 0.000 in BOTH v2 and v2.1 with identical-looking std=0.000 signatures. Geometric jitter did nothing for them.
+- Cells where the artifact doesn't dominate (D1 across all capacities, L1·D2) show v2.1 retaining v2's real cross-domain improvement over v1 — the jittered physics IS contributing meaningful signal at the smaller data scales where the detector can't latch onto the palette artifact as easily.
+
+### Phase 2 recommendation update
+
+- **Do NOT ship v2.1 to production either.** The 6 zero-EER cells confirm a learnable watermark survives even with geometric jitter — same conclusion as v2.
+- **v2.2, if attempted:** replace binary halftone thresholding with gray-level dot coverage (multi-level halftoning, e.g. ordered-dither against a 4-level threshold matrix, or post-halftone Gaussian blur to break the binary palette). This is the deeper physical change the surviving artifact points at.
+- **Real-data integration moves up significantly.** This v2.1 result is strong evidence that *any* purely synthetic halftoning — even with rich geometric variability — produces a learnable palette signature at moderate-to-large data scales. The robust path forward is real printed-page captures, where the binary-thresholded synthetic palette doesn't exist. Promote real-data integration above v2.2 in the Phase 2 prioritization.
+- **At small scales (≤ ~500 samples), v2.1 IS useful.** The L1·D1, L1·D2, L2·D1, L3·D1 cells all show meaningful cross-domain improvement over v1 with non-zero v2.1 EERs. If a future use case calls for a small synthetic training set, v2.1 is a strict improvement over v2. But for the production-scale data we'd actually want, scale tips toward the artifact regime.
+- **Mask attack module still planned independently;** unaffected by this finding except that the prioritization weight against real-data integration shifts toward real-data first.
+
+### Raw results
+
+- v2.1 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_v21/`](./2026-05-22-pad-spark-sweep-results/runs_v21/) (27 files)
+- v2.1 summary CSV: [`./2026-05-22-pad-spark-sweep-results/summary_v21.csv`](./2026-05-22-pad-spark-sweep-results/summary_v21.csv)
