@@ -1,14 +1,19 @@
-"""Phase 1 print-attack simulator.
+"""Phase 2 print-attack simulator (v2 physics).
 
-Pipeline (MVP):
+Pipeline:
   1. Paper-color tint (matte/glossy/photo per ontology)
-  2. Paper-texture multiply (procedural grain)
-  3. Perspective warp simulating a tilted printed page
-  4. Optional cutout (eyes / eyes+mouth) by zeroing pixels in the cut regions
+  2. Halftone — per-channel AM dot screening at standard rosette angles
+     (C=15°, M=75°, Y=0°, K=45°); dot-cell frequency driven by print_dpi.
+  3. ICC profile transform — gamut compression + white-point shift +
+     tone gamma, parameterized per paper_type and scaled by
+     icc_profile_strength.
+  4. Paper-texture multiplicative noise (uses RNG).
+  5. Perspective warp simulating a tilted printed page (uses RNG).
+  6. Optional cutout (eyes / eyes+mouth).
 
-The DPI axis is currently informational (recorded in params, not yet used to
-band-limit). Halftoning, ICC profiling, and anisotropic specular highlights
-are explicitly Phase 2 work.
+Anisotropic specular highlights remain explicitly deferred to a follow-up.
+The v1 single-tier-physics version is captured by ontology_version
+2026-05-11; this module corresponds to ontology_version 2026-05-22.
 """
 
 from __future__ import annotations
@@ -179,14 +184,28 @@ class PrintAttack:
         params: dict[str, Any],
         rng: np.random.Generator,
     ) -> np.ndarray:
+        # Linear-RGB float space for the float-domain stages.
         img = bonafide.astype(np.float32) / 255.0
 
+        # Paper-color tint (matte/glossy/photo).
         tint = np.array(_PAPER_TINTS[params["paper_type"]], dtype=np.float32)
         img = img * tint
 
+        # v2: halftone (driven by print_dpi).
+        img = _apply_halftone(img, params["print_dpi"])
+
+        # v2: ICC profile (keyed by paper_type, scaled by strength).
+        img = _apply_icc(
+            img,
+            params["paper_type"],
+            float(params["icc_profile_strength"]),
+        )
+
+        # Paper-texture multiplicative noise (uses RNG).
         texture = _paper_texture(img.shape[0], img.shape[1], rng)
         img = img * texture
 
+        # Back to uint8 for the spatial-domain stages.
         img = np.clip(img * 255.0, 0, 255).astype(np.uint8)
         img = _perspective_warp(img, params["tilt_degrees"], rng)
         img = _apply_cutout(img, params["cutout"])
