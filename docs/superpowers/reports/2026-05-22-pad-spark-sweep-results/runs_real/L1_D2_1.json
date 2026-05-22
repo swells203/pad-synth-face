@@ -1,0 +1,19 @@
+{
+  "capacity": "L1",
+  "data_level": "D2",
+  "seed": 1,
+  "n_train": 384,
+  "n_val_in_domain": 128,
+  "n_val_cross_domain": 1024,
+  "eer_in_domain": 0.1874232375337755,
+  "eer_cross_domain": 0.32421875,
+  "val_accuracy_in_domain": 0.765625,
+  "val_accuracy_cross_domain": 0.7080078125,
+  "train_seconds": 0.583890438079834,
+  "git_sha": "56e6218",
+  "torch_version": "2.12.0.dev20260407+cu128",
+  "cuda_version": "12.8",
+  "device": "cuda",
+  "train_root": "/home/swells/ml/datasets/real_seta_d2",
+  "eval_root": "/home/swells/ml/datasets/real_setb_d2"
+}

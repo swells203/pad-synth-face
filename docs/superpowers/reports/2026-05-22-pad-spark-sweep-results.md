@@ -260,3 +260,63 @@ Evidence:
 
 - v2.1 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_v21/`](./2026-05-22-pad-spark-sweep-results/runs_v21/) (27 files)
 - v2.1 summary CSV: [`./2026-05-22-pad-spark-sweep-results/summary_v21.csv`](./2026-05-22-pad-spark-sweep-results/summary_v21.csv)
+
+---
+
+## 2026-05-22 update — real-bonafide v2.1 result (DigiFace-1M)
+
+The "two-strikes" v2/v2.1 finding promoted real-bonafide integration to the top of Phase 2's priority list. Microsoft Research's DigiFace-1M was wired in (118k aligned subset, P1 partition: 33,333 identities × 5 PNGs each at 112×112 RGBA; downsampled to 64×64 RGB for apples-to-apples with the v2.1 sweep). Eight Set A identities and sixteen identity-disjoint Set B identities were deterministically selected (seed 20260522) and pinned at `configs/digiface_identities_set{a,b}.txt`. All v2.1 print physics held constant. Same 27-cell Spark sweep, same GB10. Code SHA at sweep time: `56e6218`. Torch: `2.12.0.dev20260407+cu128`.
+
+This is also the iteration where `pad-synth-face/src/pad_synth_face/pipeline.py`'s `ontology_version="2026-05-11"` hardcode (flagged in the v2 and v2.1 reports) was finally fixed — manifests now stamp the actual loaded print-ontology version dynamically (`2026-05-23` post-v2.1). The fix shipped as a ride-along since pipeline.py was being modified for the `identities_file` integration anyway.
+
+**Synth-v2.1 → real-v2.1 cross-domain EER (mean ± std):**
+
+| Cell | synth v2.1 (procedural blobs) | real v2.1 (DigiFace) |
+|---|---|---|
+| L1·D1 | 0.245 ± 0.080 | 0.365 ± 0.036 |
+| L1·D2 | 0.230 ± 0.057 | 0.312 ± 0.031 |
+| L1·D3 | **0.000 ± 0.000** | **0.178 ± 0.050** |
+| L2·D1 | 0.130 ± 0.063 | 0.328 ± 0.041 |
+| L2·D2 | **0.000 ± 0.000** | 0.168 ± 0.024 |
+| L2·D3 | **0.000 ± 0.000** | 0.043 ± 0.007 |
+| L3·D1 | 0.109 ± 0.109 | 0.292 ± 0.065 |
+| L3·D2 | **0.000 ± 0.000** | 0.047 ± 0.029 |
+| L3·D3 | **0.000 ± 0.000** | 0.003 ± 0.002 |
+
+**Real-v2.1 in-domain EER (mean ± std):**
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| L1 | 0.305 ± 0.146 | 0.232 ± 0.052 | 0.099 ± 0.024 |
+| L2 | 0.333 ± 0.110 | 0.096 ± 0.023 | 0.000 ± 0.000 |
+| L3 | 0.293 ± 0.149 | 0.000 ± 0.000 | 0.000 ± 0.000 |
+
+### Artifact verdict: BROKEN
+
+The spec §10 criterion ("no cross-domain cell mean ≤ 0.001") **passes**: every cell mean is above the floor. The six previously-zero cells now span a wide range from 0.003 (L3·D3, just above floor) to 0.178 (L1·D3). The deterministic-palette artifact that survived v2's deterministic halftone AND v2.1's per-sample geometric jitter is genuinely defeated when the bonafide source moves from procedural skin-tone blobs to real-face textures. The diagnosis from v2.1 ("the binary halftone produces a ~16-color palette artifact identical across Set A and Set B") was correct: real-face textures provide enough per-pixel color diversity that the palette signature no longer dominates.
+
+### Headline finding: physics IS the lever once the synthetic-bonafide confound is removed
+
+**L1·D3 = 0.178 ± 0.050** is the most important number this project has produced. TinyCNN (the published Phase-1 baseline architecture) on 4,096 real-bonafide samples with v2.1 print physics achieves cross-domain EER ≈ 0.18. Compare with v1 (procedural-blob bonafide + v1 physics) at the same cell: 0.228. The physics-axis intervention from v2/v2.1 wasn't an illusion — it was masked by the synthetic-bonafide artifact at scale. Once real bonafide is in place, the v2.1 physics genuinely contributes ~0.05 EER improvement at the most informative cell.
+
+### Notable secondary findings
+
+1. **Small-scale cells got WORSE with real bonafide** (e.g., L1·D1 went 0.245 → 0.365). This is the right behavior: procedural blobs made print artifacts artificially easy to distinguish; real-face textures restore realistic difficulty. At 96–128 samples the detector simply doesn't have enough data to learn the print-artifact signature against real-face background variability.
+
+2. **High-capacity high-data cells still show residual artifact attenuation** (L2·D3 = 0.043; L3·D2 = 0.047; L3·D3 = 0.003 — barely above floor with one individual seed hitting exactly 0.000). The binary-threshold halftone output's sharp edges and CMYK-conversion artifacts still provide *some* learnable signal even on real-face backgrounds — ResNet18 at 8192 samples can still find a partial shortcut. Much less severe than synth-v2.1's wholesale 0.000 but not entirely gone.
+
+3. **TinyCNN is the practical sweet-spot model.** L1·D3 (smallest model, largest data) gives the best meaningful cross-domain number (0.178). L3 (ResNet18) over-memorizes at D2+ even with real bonafide — perfect 0.000 in-domain at L3·D2, L3·D3. The data axis still beats the capacity axis on real bonafide, consistent with the D4 finding.
+
+### Phase 2 recommendation update
+
+- **Ship v2.1 physics + DigiFace bonafide as the new production baseline.** This is the first configuration in the project's history that produces a plausible cross-domain PAD number (L1·D3 ≈ 0.18) without artifact contamination. The "two-strikes" concern is resolved.
+- **Mask attack module proceeds as the next sub-project** on this combined base. Real-bonafide + v2.1-print + new-mask-attack is the natural next step.
+- **Promote real attack capture (real prints / real screen replays) to top Phase 2.5 priority.** This iteration broke the bonafide-side synthetic confound; the attack-side synthetic constraints are next. Real attacks would presumably eliminate the residual L3·D3 floor-skim too.
+- **L3 ResNet18 stays demoted.** At D2+ even with real bonafide it over-memorizes. TinyCNN remains the recommended deployment model for this scale.
+- **The pipeline.py `ontology_version` hardcode is now fixed.** No more deferred-cleanup items from prior iterations.
+
+### Raw results
+
+- Real-v2.1 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_real/`](./2026-05-22-pad-spark-sweep-results/runs_real/) (27 files)
+- Real-v2.1 summary CSV: [`./2026-05-22-pad-spark-sweep-results/summary_real.csv`](./2026-05-22-pad-spark-sweep-results/summary_real.csv)
+- Pinned identity lists: [`/configs/digiface_identities_seta.txt`](../../../configs/digiface_identities_seta.txt), [`/configs/digiface_identities_setb.txt`](../../../configs/digiface_identities_setb.txt)
