@@ -102,33 +102,68 @@ def _inv_cmyk(cmyk: np.ndarray) -> np.ndarray:
     return np.stack([r, g, b], axis=-1).astype(np.float32)
 
 
-def _dot_screen(h: int, w: int, cell_px: float, angle_deg: float) -> np.ndarray:
-    """2D rotated cosine dot screen, range [0,1]. Deterministic — no RNG."""
+def _dot_screen(
+    h: int,
+    w: int,
+    cell_px: float,
+    angle_deg: float,
+    dx: float = 0.0,
+    dy: float = 0.0,
+) -> np.ndarray:
+    """2D rotated cosine dot screen, range [0,1]. Deterministic — no RNG.
+    Optional (dx, dy) shift the screen origin by sub-pixel amounts."""
     theta = np.deg2rad(angle_deg)
     yv, xv = np.mgrid[0:h, 0:w].astype(np.float32)
-    xp = xv * np.cos(theta) + yv * np.sin(theta)
-    yp = -xv * np.sin(theta) + yv * np.cos(theta)
+    xs = xv - float(dx)
+    ys = yv - float(dy)
+    xp = xs * np.cos(theta) + ys * np.sin(theta)
+    yp = -xs * np.sin(theta) + ys * np.cos(theta)
     grid = np.cos(2.0 * np.pi * xp / cell_px) * np.cos(2.0 * np.pi * yp / cell_px)
     return (0.5 + 0.5 * grid).astype(np.float32)
 
 
-def _halftone_channel(channel: np.ndarray, cell_px: float, angle_deg: float) -> np.ndarray:
+def _halftone_channel(
+    channel: np.ndarray,
+    cell_px: float,
+    angle_deg: float,
+    dx: float = 0.0,
+    dy: float = 0.0,
+) -> np.ndarray:
     """Binary halftone: pixel ON where channel value > screen threshold."""
-    screen = _dot_screen(channel.shape[0], channel.shape[1], cell_px, angle_deg)
+    screen = _dot_screen(channel.shape[0], channel.shape[1], cell_px, angle_deg, dx, dy)
     return (channel > screen).astype(np.float32)
 
 
-def _apply_halftone(rgb: np.ndarray, print_dpi: int | float) -> np.ndarray:
+def _apply_halftone(
+    rgb: np.ndarray,
+    print_dpi: int | float,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
     """Per-channel AM halftoning at the standard rosette angles.
 
-    rgb: float [0,1] (H,W,3); print_dpi drives the dot-cell frequency.
-    Returns float [0,1] (H,W,3). Deterministic; no RNG.
+    rgb: float [0,1] (H,W,3); print_dpi drives the base dot-cell frequency.
+
+    When rng is None (v2 behavior): deterministic screen, no jitter.
+    When rng is provided (v2.1 behavior): per-channel per-sample jitter from
+    the spec — cell-size ~U(0.90, 1.10), angle ~N(0, 3°), sub-pixel offset
+    (dx, dy) ~U(-cell/2, +cell/2). The draw order per channel C/M/Y/K is
+    (k, Δθ, dx, dy) — see spec §3 and the plan reference block.
+
+    Returns float [0,1] (H,W,3).
     """
-    cell_px = max(2.0, round(8.0 * 150.0 / float(print_dpi)))
+    base_cell = max(2.0, round(8.0 * 150.0 / float(print_dpi)))
     cmyk = _to_cmyk(rgb)
     out = np.empty_like(cmyk)
-    for i, angle in enumerate(_HALFTONE_ANGLES_DEG):
-        out[..., i] = _halftone_channel(cmyk[..., i], cell_px, angle)
+    for i, base_angle in enumerate(_HALFTONE_ANGLES_DEG):
+        if rng is None:
+            cell_px, angle, dx, dy = base_cell, base_angle, 0.0, 0.0
+        else:
+            k = float(rng.uniform(0.90, 1.10))
+            cell_px = max(2.0, base_cell * k)
+            angle = base_angle + float(rng.normal(0.0, 3.0))
+            dx = float(rng.uniform(-cell_px / 2.0, cell_px / 2.0))
+            dy = float(rng.uniform(-cell_px / 2.0, cell_px / 2.0))
+        out[..., i] = _halftone_channel(cmyk[..., i], cell_px, angle, dx, dy)
     return _inv_cmyk(out)
 
 
