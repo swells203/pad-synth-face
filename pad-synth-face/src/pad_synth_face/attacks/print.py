@@ -1,14 +1,19 @@
-"""Phase 1 print-attack simulator.
+"""Phase 2 print-attack simulator (v2 physics).
 
-Pipeline (MVP):
+Pipeline:
   1. Paper-color tint (matte/glossy/photo per ontology)
-  2. Paper-texture multiply (procedural grain)
-  3. Perspective warp simulating a tilted printed page
-  4. Optional cutout (eyes / eyes+mouth) by zeroing pixels in the cut regions
+  2. Halftone — per-channel AM dot screening at standard rosette angles
+     (C=15°, M=75°, Y=0°, K=45°); dot-cell frequency driven by print_dpi.
+  3. ICC profile transform — gamut compression + white-point shift +
+     tone gamma, parameterized per paper_type and scaled by
+     icc_profile_strength.
+  4. Paper-texture multiplicative noise (uses RNG).
+  5. Perspective warp simulating a tilted printed page (uses RNG).
+  6. Optional cutout (eyes / eyes+mouth).
 
-The DPI axis is currently informational (recorded in params, not yet used to
-band-limit). Halftoning, ICC profiling, and anisotropic specular highlights
-are explicitly Phase 2 work.
+Anisotropic specular highlights remain explicitly deferred to a follow-up.
+The v1 single-tier-physics version is captured by ontology_version
+2026-05-11; this module corresponds to ontology_version 2026-05-22.
 """
 
 from __future__ import annotations
@@ -71,6 +76,98 @@ def _apply_cutout(img: np.ndarray, cutout: str) -> np.ndarray:
     return out
 
 
+# --- v2 physics: halftoning ---------------------------------------------------
+
+# CMYK rosette angles (degrees) per standard 4-color print convention.
+_HALFTONE_ANGLES_DEG: tuple[float, float, float, float] = (15.0, 75.0, 0.0, 45.0)
+
+
+def _to_cmyk(rgb: np.ndarray) -> np.ndarray:
+    """RGB float [0,1] (H,W,3) -> CMYK float [0,1] (H,W,4). No profile math."""
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    k = 1.0 - np.maximum(np.maximum(r, g), b)
+    denom = np.where(k < 1.0, 1.0 - k, 1.0)
+    c = np.where(k < 1.0, (1.0 - r - k) / denom, 0.0)
+    m = np.where(k < 1.0, (1.0 - g - k) / denom, 0.0)
+    y = np.where(k < 1.0, (1.0 - b - k) / denom, 0.0)
+    return np.stack([c, m, y, k], axis=-1).astype(np.float32)
+
+
+def _inv_cmyk(cmyk: np.ndarray) -> np.ndarray:
+    """CMYK float [0,1] (H,W,4) -> RGB float [0,1] (H,W,3)."""
+    c, m, y, k = cmyk[..., 0], cmyk[..., 1], cmyk[..., 2], cmyk[..., 3]
+    r = (1.0 - c) * (1.0 - k)
+    g = (1.0 - m) * (1.0 - k)
+    b = (1.0 - y) * (1.0 - k)
+    return np.stack([r, g, b], axis=-1).astype(np.float32)
+
+
+def _dot_screen(h: int, w: int, cell_px: float, angle_deg: float) -> np.ndarray:
+    """2D rotated cosine dot screen, range [0,1]. Deterministic — no RNG."""
+    theta = np.deg2rad(angle_deg)
+    yv, xv = np.mgrid[0:h, 0:w].astype(np.float32)
+    xp = xv * np.cos(theta) + yv * np.sin(theta)
+    yp = -xv * np.sin(theta) + yv * np.cos(theta)
+    grid = np.cos(2.0 * np.pi * xp / cell_px) * np.cos(2.0 * np.pi * yp / cell_px)
+    return (0.5 + 0.5 * grid).astype(np.float32)
+
+
+def _halftone_channel(channel: np.ndarray, cell_px: float, angle_deg: float) -> np.ndarray:
+    """Binary halftone: pixel ON where channel value > screen threshold."""
+    screen = _dot_screen(channel.shape[0], channel.shape[1], cell_px, angle_deg)
+    return (channel > screen).astype(np.float32)
+
+
+def _apply_halftone(rgb: np.ndarray, print_dpi: int | float) -> np.ndarray:
+    """Per-channel AM halftoning at the standard rosette angles.
+
+    rgb: float [0,1] (H,W,3); print_dpi drives the dot-cell frequency.
+    Returns float [0,1] (H,W,3). Deterministic; no RNG.
+    """
+    cell_px = max(2.0, round(8.0 * 150.0 / float(print_dpi)))
+    cmyk = _to_cmyk(rgb)
+    out = np.empty_like(cmyk)
+    for i, angle in enumerate(_HALFTONE_ANGLES_DEG):
+        out[..., i] = _halftone_channel(cmyk[..., i], cell_px, angle)
+    return _inv_cmyk(out)
+
+
+# --- v2 physics: ICC profile simulation ---------------------------------------
+
+# Per-paper-type tuple: (gamut_compression, (Δx, Δy) white-point shift, tone_gamma).
+# Parameters per spec §4.1; references: Lukac & Plataniotis (eds.), 2007;
+# Marini & Rizzi 2000 (white-point handling).
+_ICC_PARAMS: dict[str, tuple[float, tuple[float, float], float]] = {
+    "matte":  (0.12, (+0.012, +0.008), 1.10),
+    "glossy": (0.05, (+0.002, +0.001), 0.95),
+    "photo":  (0.03, (-0.003, -0.002), 0.92),
+}
+
+
+def _apply_icc(rgb: np.ndarray, paper_type: str, strength: float) -> np.ndarray:
+    """sRGB-space parameterized print-profile transform.
+
+    rgb: float [0,1] (H,W,3); paper_type in {matte, glossy, photo};
+    strength scales the gamut-compression effect [0,1]. Returns float [0,1].
+    """
+    gamut, (dx, dy), gamma = _ICC_PARAMS[paper_type]
+    out = rgb.astype(np.float32, copy=True)
+
+    # 1. Gamut compression: pull every pixel toward middle gray by c.
+    c = float(gamut) * float(strength)
+    out = (1.0 - c) * out + c * 0.5
+
+    # 2. White-point shift: chromaticity-to-RGB approximation (clipped later).
+    out[..., 0] += float(dx) * 0.5
+    out[..., 1] += float(dy) * 0.5
+    out[..., 2] -= (float(dx) + float(dy)) * 0.25
+
+    # 3. Tone curve: out := out ** (1/gamma).
+    out = np.clip(out, 0.0, 1.0) ** (1.0 / float(gamma))
+
+    return out.astype(np.float32)
+
+
 class PrintAttack:
     name = "print"
 
@@ -87,14 +184,28 @@ class PrintAttack:
         params: dict[str, Any],
         rng: np.random.Generator,
     ) -> np.ndarray:
+        # Linear-RGB float space for the float-domain stages.
         img = bonafide.astype(np.float32) / 255.0
 
+        # Paper-color tint (matte/glossy/photo).
         tint = np.array(_PAPER_TINTS[params["paper_type"]], dtype=np.float32)
         img = img * tint
 
+        # v2: halftone (driven by print_dpi).
+        img = _apply_halftone(img, params["print_dpi"])
+
+        # v2: ICC profile (keyed by paper_type, scaled by strength).
+        img = _apply_icc(
+            img,
+            params["paper_type"],
+            float(params["icc_profile_strength"]),
+        )
+
+        # Paper-texture multiplicative noise (uses RNG).
         texture = _paper_texture(img.shape[0], img.shape[1], rng)
         img = img * texture
 
+        # Back to uint8 for the spatial-domain stages.
         img = np.clip(img * 255.0, 0, 255).astype(np.uint8)
         img = _perspective_warp(img, params["tilt_degrees"], rng)
         img = _apply_cutout(img, params["cutout"])

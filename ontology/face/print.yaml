@@ -1,4 +1,4 @@
-version: "2026-05-11"
+version: "2026-05-22"
 attack_type: print
 axes:
   paper_type:
@@ -8,7 +8,6 @@ axes:
     provenance:
       paper: "Galbally et al., 'Biometric Antispoofing Methods: A Survey in Face Recognition', IEEE Access 2014"
       doi: "10.1109/ACCESS.2014.2381273"
-  # informational only — recorded in attack_params but not consumed by Phase 1 simulate()
   print_dpi:
     type: categorical
     values: [150, 300, 600, 1200]
@@ -38,3 +37,11 @@ axes:
     provenance:
       paper: "Zhang et al., 'A Face Antispoofing Database with Diverse Attacks', ICB 2012 (CASIA-FASD attack design)"
       doi: "10.1109/ICB.2012.6199754"
+  icc_profile_strength:
+    type: uniform
+    low: 0.5
+    high: 1.0
+    provenance:
+      paper: "Lukac & Plataniotis (eds.), Color Image Processing: Methods and Applications, CRC Press 2007"
+      doi: null
+      url: null

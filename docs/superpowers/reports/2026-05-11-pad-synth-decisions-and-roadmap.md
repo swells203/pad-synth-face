@@ -315,3 +315,10 @@ The Phase 1.5 open question (capacity- / data- / physics-limited) has been disam
 ## 2026-05-22 update — D4 (16k+/32k+) sweep extension
 
 The data-limited diagnosis was extended with a D4 tier (Set A = 16k, Set B = 32k samples). **D4 verdict: axis plateaus.** L1 and L2 cross-domain EER is statistically unchanged from D3; L3 actually rises slightly (overfitting signature: in-domain collapses to 0.04 while cross-domain stays at 0.26). The Phase 2 recommendation reweights: promote print-physics + mask-attack work; bound generation scale around D3; consider real-data integration. See [`2026-05-22-pad-spark-sweep-results.md`](./2026-05-22-pad-spark-sweep-results.md) §"D4 result" for the updated heatmap column.
+
+
+---
+
+## 2026-05-22 update — v2 print physics sweep (artifact found)
+
+Print attack upgraded to v2 (halftoning + ICC). 27-cell v1-vs-v2 sweep at D1–D3 numerically fires across all cells (Δ +0.156 to +0.250 cross-domain), BUT 6/9 cells hit exactly 0.000 EER both in-domain and cross-domain — diagnostic signature of a **generator-fingerprint artifact**: the deterministic halftone screen creates an identical watermark in Set A and Set B that the detector trivially learns. v2-as-implemented should NOT ship as production training data. Next iteration v2.1 needs halftone jitter (random sub-pixel offsets, jittered angles, varied dot shapes). Mask attack module still planned independently. Real-data integration rises in priority. See [`2026-05-22-pad-spark-sweep-results.md`](./2026-05-22-pad-spark-sweep-results.md) §"v2 print physics result" for details.
