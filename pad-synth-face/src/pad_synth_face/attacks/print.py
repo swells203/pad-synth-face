@@ -71,6 +71,62 @@ def _apply_cutout(img: np.ndarray, cutout: str) -> np.ndarray:
     return out
 
 
+# --- v2 physics: halftoning ---------------------------------------------------
+
+# CMYK rosette angles (degrees) per standard 4-color print convention.
+_HALFTONE_ANGLES_DEG: tuple[float, float, float, float] = (15.0, 75.0, 0.0, 45.0)
+
+
+def _to_cmyk(rgb: np.ndarray) -> np.ndarray:
+    """RGB float [0,1] (H,W,3) -> CMYK float [0,1] (H,W,4). No profile math."""
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    k = 1.0 - np.maximum(np.maximum(r, g), b)
+    denom = np.where(k < 1.0, 1.0 - k, 1.0)
+    c = np.where(k < 1.0, (1.0 - r - k) / denom, 0.0)
+    m = np.where(k < 1.0, (1.0 - g - k) / denom, 0.0)
+    y = np.where(k < 1.0, (1.0 - b - k) / denom, 0.0)
+    return np.stack([c, m, y, k], axis=-1).astype(np.float32)
+
+
+def _inv_cmyk(cmyk: np.ndarray) -> np.ndarray:
+    """CMYK float [0,1] (H,W,4) -> RGB float [0,1] (H,W,3)."""
+    c, m, y, k = cmyk[..., 0], cmyk[..., 1], cmyk[..., 2], cmyk[..., 3]
+    r = (1.0 - c) * (1.0 - k)
+    g = (1.0 - m) * (1.0 - k)
+    b = (1.0 - y) * (1.0 - k)
+    return np.stack([r, g, b], axis=-1).astype(np.float32)
+
+
+def _dot_screen(h: int, w: int, cell_px: float, angle_deg: float) -> np.ndarray:
+    """2D rotated cosine dot screen, range [0,1]. Deterministic — no RNG."""
+    theta = np.deg2rad(angle_deg)
+    yv, xv = np.mgrid[0:h, 0:w].astype(np.float32)
+    xp = xv * np.cos(theta) + yv * np.sin(theta)
+    yp = -xv * np.sin(theta) + yv * np.cos(theta)
+    grid = np.cos(2.0 * np.pi * xp / cell_px) * np.cos(2.0 * np.pi * yp / cell_px)
+    return (0.5 + 0.5 * grid).astype(np.float32)
+
+
+def _halftone_channel(channel: np.ndarray, cell_px: float, angle_deg: float) -> np.ndarray:
+    """Binary halftone: pixel ON where channel value > screen threshold."""
+    screen = _dot_screen(channel.shape[0], channel.shape[1], cell_px, angle_deg)
+    return (channel > screen).astype(np.float32)
+
+
+def _apply_halftone(rgb: np.ndarray, print_dpi: int | float) -> np.ndarray:
+    """Per-channel AM halftoning at the standard rosette angles.
+
+    rgb: float [0,1] (H,W,3); print_dpi drives the dot-cell frequency.
+    Returns float [0,1] (H,W,3). Deterministic; no RNG.
+    """
+    cell_px = max(2.0, round(8.0 * 150.0 / float(print_dpi)))
+    cmyk = _to_cmyk(rgb)
+    out = np.empty_like(cmyk)
+    for i, angle in enumerate(_HALFTONE_ANGLES_DEG):
+        out[..., i] = _halftone_channel(cmyk[..., i], cell_px, angle)
+    return _inv_cmyk(out)
+
+
 class PrintAttack:
     name = "print"
 
