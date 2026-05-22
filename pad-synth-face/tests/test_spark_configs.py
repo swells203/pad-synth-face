@@ -13,6 +13,8 @@ EXPECTED = {
     "spark_setb_d1.yaml": (20260523, "webcam-1080p", "./datasets/_fixtures/extended_fixture", 4),
     "spark_setb_d2.yaml": (20260523, "webcam-1080p", "./datasets/_fixtures/extended_fixture", 32),
     "spark_setb_d3.yaml": (20260523, "webcam-1080p", "./datasets/_fixtures/extended_fixture", 256),
+    "spark_seta_d4.yaml": (20260522, "mobile-front-2024", "./datasets/_fixtures/digiface", 1024),
+    "spark_setb_d4.yaml": (20260523, "webcam-1080p", "./datasets/_fixtures/extended_fixture", 1024),
 }
 
 
