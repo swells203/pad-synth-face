@@ -157,3 +157,53 @@ def test_pipeline_accepts_webcam_1080p_preset(
     manifest_path = Path(config["run"]["output"]) / "manifest.jsonl"
     first = json.loads(manifest_path.read_text().splitlines()[0])
     assert first["sensor_preset"] == "webcam-1080p"
+
+
+def test_run_pipeline_with_three_attacks(
+    fixture_bonafide_dir: Path, tmp_path: Path
+):
+    config = {
+        "run": {
+            "name": "three_attacks",
+            "output": str(tmp_path / "out"),
+            "seed": 2024,
+            "deterministic": True,
+        },
+        "modality": "face",
+        "bonafide": {"root": str(fixture_bonafide_dir), "samples_per_bonafide": 2},
+        "attacks": {
+            "print": {
+                "weight": 1.0,
+                "ontology": str(REPO_ROOT / "ontology" / "face" / "print.yaml"),
+            },
+            "replay": {
+                "weight": 1.0,
+                "ontology": str(REPO_ROOT / "ontology" / "face" / "replay.yaml"),
+            },
+            "mask": {
+                "weight": 1.0,
+                "ontology": str(REPO_ROOT / "ontology" / "face" / "mask.yaml"),
+            },
+        },
+        "sensor_preset": "mobile-front-2024",
+    }
+    cfg_path = tmp_path / "three.yaml"
+    cfg_path.write_text(yaml.safe_dump(config))
+
+    summary = run_pipeline(cfg_path)
+    # 8 identities x samples_per_bonafide=2 = 16 attack slots, 16 bonafide.
+    # (Attack type per slot is an independent weighted draw, so we assert the
+    # three-attack path runs cleanly and only valid types appear, not that
+    # mask appears for this specific seed.)
+    assert summary["samples_generated"] == 16
+    assert summary["bonafide_emitted"] == 16
+    assert summary["samples_failed"] == 0
+
+    manifest = (Path(config["run"]["output"]) / "manifest.jsonl").read_text()
+    attack_types = {
+        json.loads(line)["attack_type"]
+        for line in manifest.splitlines()
+        if json.loads(line)["label"] == "attack"
+    }
+    assert attack_types.issubset({"print", "replay", "mask"})
+    assert attack_types  # at least one attack was emitted

@@ -34,6 +34,10 @@ def _run(tmp_path: Path) -> dict[str, str]:
                 "weight": 1.0,
                 "ontology": str(REPO_ROOT / "ontology" / "face" / "replay.yaml"),
             },
+            "mask": {
+                "weight": 1.0,
+                "ontology": str(REPO_ROOT / "ontology" / "face" / "mask.yaml"),
+            },
         },
         "sensor_preset": "mobile-front-2024",
     }
