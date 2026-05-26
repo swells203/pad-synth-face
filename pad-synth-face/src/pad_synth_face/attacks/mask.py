@@ -48,7 +48,7 @@ _MASK_MATERIALS: dict[str, MaskMaterial] = {
 
 def _texture_loss(img: np.ndarray, sigma: float) -> np.ndarray:
     """Gaussian low-pass: masks lack fine skin-pore detail. Continuous."""
-    k = max(3, int(2 * round(sigma) + 1))
+    k = max(3, 2 * int(np.ceil(3.0 * sigma)) + 1)
     return cv2.GaussianBlur(img, (k, k), sigmaX=float(sigma), sigmaY=float(sigma))
 
 
@@ -65,6 +65,7 @@ def _dome_normals(h: int, w: int) -> np.ndarray:
 
 
 def _light_dir(azimuth_deg: float, elevation_deg: float) -> np.ndarray:
+    """Unit light-direction vector from azimuth/elevation in degrees."""
     az = np.deg2rad(azimuth_deg)
     el = np.deg2rad(elevation_deg)
     return np.array(
@@ -75,10 +76,10 @@ def _light_dir(azimuth_deg: float, elevation_deg: float) -> np.ndarray:
 
 def _shading(img: np.ndarray, normals: np.ndarray, light: np.ndarray,
              strength: float = 0.35) -> np.ndarray:
-    """Lambertian shading gradient lit by `light`."""
+    """Lambertian shading gradient lit by `light`. Output clipped to [0,1]."""
     lam = np.clip((normals * light).sum(axis=-1), 0.0, 1.0)
     factor = (1.0 - strength) + strength * lam[..., None]
-    return img * factor
+    return np.clip(img * factor, 0.0, 1.0)
 
 
 def _specular(img: np.ndarray, normals: np.ndarray, light: np.ndarray,

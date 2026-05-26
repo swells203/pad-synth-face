@@ -61,6 +61,8 @@ def test_mask_output_is_not_quantised():
     srng = sample_rng(5)
     out = attack.simulate(bonafide, attack.sample_params(srng), srng)
     n_colors = np.unique(out.reshape(-1, 3), axis=0).shape[0]
+    # The v2 halftone watermark collapsed to ~16 colours; >1000 distinct
+    # colours (of 4096 pixels) confirms continuous, non-quantised output.
     assert n_colors > 1000
 
 
@@ -72,8 +74,7 @@ def test_mask_materials_are_distinguishable():
     outs = {}
     for mat in ("paper", "silicone", "resin"):
         rng = sample_rng(42)
-        params = attack.sample_params(rng)
-        params["mask_type"] = mat  # hold all other axes fixed
+        params = {**attack.sample_params(rng), "mask_type": mat}
         outs[mat] = attack.simulate(bonafide, params, rng)
 
     assert not np.array_equal(outs["paper"], outs["silicone"])
@@ -92,3 +93,14 @@ def test_mask_preserves_shape_and_range_on_random_input():
     assert out.shape == (64, 64, 3)
     assert out.dtype == np.uint8
     assert out.min() >= 0 and out.max() <= 255
+
+
+def test_aperture_mismatch_darkens_eye_region():
+    """Guard that the aperture stage fires (not silently a no-op)."""
+    from pad_synth_face.attacks.mask import _aperture_mismatch
+
+    img = np.ones((64, 64, 3), dtype=np.float32)
+    rng = sample_rng(0)
+    out = _aperture_mismatch(img, 0.0, rng)
+    # Left-eye centre (~0.36*64, 0.30*64) must be darker than a corner.
+    assert out[23, 19].mean() < out[2, 2].mean()
