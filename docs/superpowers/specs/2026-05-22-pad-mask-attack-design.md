@@ -92,7 +92,7 @@ Operates on the `(64, 64, 3)` bonafide array in float `[0,1]`, returns `uint8`. 
 1. **Texture-loss** — Gaussian low-pass (masks lack skin-pore detail); σ from the material bundle plus small per-sample jitter.
 2. **Material color cast** — continuous multiplicative tint + subsurface additive tint from the bundle.
 3. **Pseudo-3D shading** — an analytic elliptical-dome shading gradient (an image-space parametric field, *not* a per-face depth map), Lambertian term lit by `light_azimuth_deg` / `light_elevation_deg`. Image-space, consistent with replay's sheen overlay.
-4. **Specular highlight** — a soft Gaussian highlight blob positioned from the light direction, intensity = `specular_strength × material specular_scale`, with jittered size and sub-pixel position.
+4. **Specular highlight** — a soft Blinn-Phong highlight whose position follows the per-sample light direction (`light_azimuth_deg`/`light_elevation_deg`); intensity = `specular_strength × material gloss` with per-sample rng jitter.
 5. **Aperture mismatch** — soft darkened/offset eye and mouth regions (reuses print's region geometry, but soft-edged and offset by `aperture_misalignment_px`, not a hard cutout).
 6. **Surface warp** — mild perspective/elastic warp for the drape, magnitude from `surface_warp` (reuses the `_perspective_warp` style).
 7. **Seam** — a subtle darkened elliptical perimeter ring, intensity = `seam_visibility`.

@@ -125,12 +125,18 @@ def _drape_warp(img: np.ndarray, amount: float,
     return cv2.warpPerspective(img, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
 
 
-def _seam(img: np.ndarray, visibility: float) -> np.ndarray:
-    """Darkened elliptical ring at the mask perimeter."""
+def _seam(img: np.ndarray, visibility: float,
+          rng: np.random.Generator) -> np.ndarray:
+    """Darkened elliptical ring at the mask perimeter, with per-sample
+    jittered centre and radii so the seam geometry is not fixed across
+    samples."""
     h, w = img.shape[:2]
     yv, xv = np.mgrid[0:h, 0:w].astype(np.float32)
-    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
-    r = np.sqrt(((yv - cy) / (h * 0.46)) ** 2 + ((xv - cx) / (w * 0.40)) ** 2)
+    cy = (h - 1) / 2.0 + float(rng.uniform(-0.04, 0.04)) * h
+    cx = (w - 1) / 2.0 + float(rng.uniform(-0.04, 0.04)) * w
+    ry = h * 0.46 * float(rng.uniform(0.95, 1.05))
+    rx = w * 0.40 * float(rng.uniform(0.95, 1.05))
+    r = np.sqrt(((yv - cy) / ry) ** 2 + ((xv - cx) / rx) ** 2)
     ring = np.exp(-((r - 1.0) ** 2) / (2.0 * 0.08**2))
     factor = 1.0 - visibility * 0.5 * ring[..., None]
     return img * factor
@@ -186,6 +192,6 @@ class MaskAttack:
         img = _drape_warp(img, float(params["surface_warp"]), rng)
 
         # 7. Perimeter seam.
-        img = _seam(img, float(params["seam_visibility"]))
+        img = _seam(img, float(params["seam_visibility"]), rng)
 
         return np.clip(img * 255.0, 0, 255).astype(np.uint8)

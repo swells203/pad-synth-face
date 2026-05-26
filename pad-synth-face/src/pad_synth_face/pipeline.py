@@ -123,9 +123,10 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
         for name, spec in cfg["attacks"].items()
     }
     # Single canonical ontology_version for all sample records in this run.
-    # Bonafide records share the print attack's version since bonafide has
-    # no attack ontology of its own; the print ontology is the dominant
-    # version-tracked component of the dataset.
+    # Bonafide records have no attack ontology of their own, so they borrow
+    # one attack's version via _canonical_ontology_version (priority:
+    # print -> replay -> mask -> alphabetical), which is robust to configs
+    # that omit any given attack (e.g. mask-only runs).
     _ontology_version = _canonical_ontology_version(attack_modules)
     sensor_preset = _SENSOR_REGISTRY[cfg["sensor_preset"]]
 
