@@ -28,13 +28,14 @@ from pad_synth_core.provenance import (
 )
 from pad_synth_core.qc.per_sample import check_image_basic
 from pad_synth_core.rng import derive_sample_seed, sample_rng
+from pad_synth_face.attacks.mask import MaskAttack
 from pad_synth_face.attacks.print import PrintAttack
 from pad_synth_face.attacks.replay import ReplayAttack
 from pad_synth_face.bonafide import DigiFaceLoader
 from pad_synth_face.sensor import MOBILE_FRONT_2024, WEBCAM_1080P, apply_sensor
 
 
-_ATTACK_REGISTRY = {"print": PrintAttack, "replay": ReplayAttack}
+_ATTACK_REGISTRY = {"print": PrintAttack, "replay": ReplayAttack, "mask": MaskAttack}
 _SENSOR_REGISTRY = {
     "mobile-front-2024": MOBILE_FRONT_2024,
     "webcam-1080p": WEBCAM_1080P,
