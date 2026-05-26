@@ -37,3 +37,58 @@ def test_mask_attack_is_deterministic():
 
     assert p1 == p2
     assert np.array_equal(out1, out2)
+
+
+def test_mask_jitter_different_seeds_differ():
+    """Load-bearing anti-watermark invariant: two rngs -> two outputs."""
+    bonafide = np.full((64, 64, 3), 150, dtype=np.uint8)
+    attack = MaskAttack(_ontology())
+
+    rng1 = sample_rng(1)
+    out1 = attack.simulate(bonafide, attack.sample_params(rng1), rng1)
+    rng2 = sample_rng(2)
+    out2 = attack.simulate(bonafide, attack.sample_params(rng2), rng2)
+
+    assert not np.array_equal(out1, out2)
+
+
+def test_mask_output_is_not_quantised():
+    """Anti-palette guard (the exact v2 halftone mistake): continuous output
+    must have far more than the 16-colour palette that produced the watermark."""
+    rng = sample_rng(0)
+    bonafide = rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8)
+    attack = MaskAttack(_ontology())
+    srng = sample_rng(5)
+    out = attack.simulate(bonafide, attack.sample_params(srng), srng)
+    n_colors = np.unique(out.reshape(-1, 3), axis=0).shape[0]
+    assert n_colors > 1000
+
+
+def test_mask_materials_are_distinguishable():
+    """The three mask_type bundles must produce measurably different images."""
+    bonafide = np.full((64, 64, 3), 140, dtype=np.uint8)
+    attack = MaskAttack(_ontology())
+
+    outs = {}
+    for mat in ("paper", "silicone", "resin"):
+        rng = sample_rng(42)
+        params = attack.sample_params(rng)
+        params["mask_type"] = mat  # hold all other axes fixed
+        outs[mat] = attack.simulate(bonafide, params, rng)
+
+    assert not np.array_equal(outs["paper"], outs["silicone"])
+    assert not np.array_equal(outs["silicone"], outs["resin"])
+    means = {m: float(o.mean()) for m, o in outs.items()}
+    # Materials differ by more than rounding noise.
+    assert max(means.values()) - min(means.values()) > 1.0
+
+
+def test_mask_preserves_shape_and_range_on_random_input():
+    rng = sample_rng(9)
+    bonafide = rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8)
+    attack = MaskAttack(_ontology())
+    srng = sample_rng(3)
+    out = attack.simulate(bonafide, attack.sample_params(srng), srng)
+    assert out.shape == (64, 64, 3)
+    assert out.dtype == np.uint8
+    assert out.min() >= 0 and out.max() <= 255
