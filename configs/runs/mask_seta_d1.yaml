@@ -1,0 +1,23 @@
+run:
+  name: mask_seta_d1
+  output: ./datasets/mask_seta_d1
+  seed: 20260522
+  deterministic: true
+
+modality: face
+
+bonafide:
+  root: ./datasets/_real/digiface_118k_64
+  samples_per_bonafide: 6
+  identities_file: ./configs/digiface_identities_seta.txt
+  splits:
+    train: 0.0
+    dev: 0.0
+    test: 1.0
+
+attacks:
+  mask:
+    weight: 1.0
+    ontology: ./ontology/face/mask.yaml
+
+sensor_preset: mobile-front-2024
