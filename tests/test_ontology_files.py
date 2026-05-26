@@ -22,6 +22,8 @@ def test_replay_ontology_loads():
 def test_mask_ontology_loads():
     ont = load_ontology(REPO_ROOT / "ontology" / "face" / "mask.yaml")
     assert ont.attack_type == "mask"
+    # Version pin is intentional: the mask simulator (attacks/mask.py) and the
+    # spec tie behaviour to this ontology version. Bump both together if it changes.
     assert ont.version == "2026-05-22"
     assert set(ont.axes) == {
         "mask_type",

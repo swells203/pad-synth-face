@@ -48,5 +48,5 @@ axes:
     low: 0.0
     high: 1.0
     provenance:
-      paper: "Liu et al., 'CASIA-SURF / HiFiMask', CVPR 2021 (mask-boundary / seam artifacts)"
+      paper: "Liu et al., 'CASIA-SURF / HiFiMask: A Large-Scale High-Fidelity Mask Dataset', CVPR 2021 (mask-boundary / seam artifacts)"
       doi: "10.1109/CVPR46437.2021.00616"
