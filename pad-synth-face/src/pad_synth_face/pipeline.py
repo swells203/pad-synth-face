@@ -67,6 +67,22 @@ def _record_ontology_citations(
         )
 
 
+def _canonical_ontology_version(attack_modules: dict[str, Any]) -> str:
+    """Pick one canonical ontology version to stamp on every sample record.
+
+    Bonafide records have no attack ontology of their own, so the dataset
+    borrows one attack's version. Prefer print (the dominant version-tracked
+    component historically), then replay, then mask; otherwise fall back to
+    the alphabetically-first attack present. Robust to mask-only configs that
+    have no print attack.
+    """
+    for preferred in ("print", "replay", "mask"):
+        if preferred in attack_modules:
+            return attack_modules[preferred].ontology.version
+    first = sorted(attack_modules)[0]
+    return attack_modules[first].ontology.version
+
+
 def run_pipeline(config_path: Path) -> dict[str, Any]:
     cfg = yaml.safe_load(Path(config_path).read_text())
     out_root = Path(cfg["run"]["output"])
@@ -109,7 +125,7 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
     # Bonafide records share the print attack's version since bonafide has
     # no attack ontology of its own; the print ontology is the dominant
     # version-tracked component of the dataset.
-    _ontology_version = attack_modules["print"].ontology.version
+    _ontology_version = _canonical_ontology_version(attack_modules)
     sensor_preset = _SENSOR_REGISTRY[cfg["sensor_preset"]]
 
     items = enumerate_work_items(
