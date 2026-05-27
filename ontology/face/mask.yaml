@@ -1,0 +1,52 @@
+version: "2026-05-22"
+attack_type: mask
+axes:
+  mask_type:
+    type: categorical
+    values: [paper, silicone, resin]
+    weights: [0.30, 0.45, 0.25]
+    provenance:
+      paper: "Liu et al., 'CASIA-SURF / HiFiMask: A Large-Scale High-Fidelity Mask Dataset', CVPR 2021 (material range and prevalence)"
+      doi: "10.1109/CVPR46437.2021.00616"
+  light_azimuth_deg:
+    type: uniform
+    low: -180.0
+    high: 180.0
+    provenance:
+      paper: "Erdogmus & Marcel, 'Spoofing Face Recognition with 3D Masks', IEEE TIFS 2014 (3DMAD capture lighting geometry)"
+      doi: "10.1109/TIFS.2014.2322255"
+  light_elevation_deg:
+    type: uniform
+    low: 10.0
+    high: 80.0
+    provenance:
+      paper: "Erdogmus & Marcel, 'Spoofing Face Recognition with 3D Masks', IEEE TIFS 2014 (3DMAD capture lighting geometry)"
+      doi: "10.1109/TIFS.2014.2322255"
+  specular_strength:
+    type: uniform
+    low: 0.0
+    high: 1.0
+    provenance:
+      paper: "Manjani et al., 'Detecting Silicone Mask-Based Presentation Attack via Deep Dictionary Learning', IEEE TIFS 2017 (SMAD silicone gloss appearance)"
+      doi: "10.1109/TIFS.2017.2676720"
+  aperture_misalignment_px:
+    type: uniform
+    low: 0.0
+    high: 4.0
+    provenance:
+      paper: "Erdogmus & Marcel, 'Spoofing Face Recognition with 3D Masks', IEEE TIFS 2014 (eye/mouth aperture mismatch cue)"
+      doi: "10.1109/TIFS.2014.2322255"
+  surface_warp:
+    type: uniform
+    low: 0.0
+    high: 1.0
+    provenance:
+      paper: "Manjani et al., 'Detecting Silicone Mask-Based Presentation Attack via Deep Dictionary Learning', IEEE TIFS 2017 (flexible-mask drape deformation)"
+      doi: "10.1109/TIFS.2017.2676720"
+  seam_visibility:
+    type: uniform
+    low: 0.0
+    high: 1.0
+    provenance:
+      paper: "Liu et al., 'CASIA-SURF / HiFiMask: A Large-Scale High-Fidelity Mask Dataset', CVPR 2021 (mask-boundary / seam artifacts)"
+      doi: "10.1109/CVPR46437.2021.00616"

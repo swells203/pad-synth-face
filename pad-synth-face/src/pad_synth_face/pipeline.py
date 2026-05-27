@@ -28,13 +28,14 @@ from pad_synth_core.provenance import (
 )
 from pad_synth_core.qc.per_sample import check_image_basic
 from pad_synth_core.rng import derive_sample_seed, sample_rng
+from pad_synth_face.attacks.mask import MaskAttack
 from pad_synth_face.attacks.print import PrintAttack
 from pad_synth_face.attacks.replay import ReplayAttack
 from pad_synth_face.bonafide import DigiFaceLoader
 from pad_synth_face.sensor import MOBILE_FRONT_2024, WEBCAM_1080P, apply_sensor
 
 
-_ATTACK_REGISTRY = {"print": PrintAttack, "replay": ReplayAttack}
+_ATTACK_REGISTRY = {"print": PrintAttack, "replay": ReplayAttack, "mask": MaskAttack}
 _SENSOR_REGISTRY = {
     "mobile-front-2024": MOBILE_FRONT_2024,
     "webcam-1080p": WEBCAM_1080P,
@@ -65,6 +66,22 @@ def _record_ontology_citations(
                 url=prov.get("url"),
             )
         )
+
+
+def _canonical_ontology_version(attack_modules: dict[str, Any]) -> str:
+    """Pick one canonical ontology version to stamp on every sample record.
+
+    Bonafide records have no attack ontology of their own, so the dataset
+    borrows one attack's version. Prefer print (the dominant version-tracked
+    component historically), then replay, then mask; otherwise fall back to
+    the alphabetically-first attack present. Robust to mask-only configs that
+    have no print attack.
+    """
+    for preferred in ("print", "replay", "mask"):
+        if preferred in attack_modules:
+            return attack_modules[preferred].ontology.version
+    first = sorted(attack_modules)[0]
+    return attack_modules[first].ontology.version
 
 
 def run_pipeline(config_path: Path) -> dict[str, Any]:
@@ -106,10 +123,11 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
         for name, spec in cfg["attacks"].items()
     }
     # Single canonical ontology_version for all sample records in this run.
-    # Bonafide records share the print attack's version since bonafide has
-    # no attack ontology of its own; the print ontology is the dominant
-    # version-tracked component of the dataset.
-    _ontology_version = attack_modules["print"].ontology.version
+    # Bonafide records have no attack ontology of their own, so they borrow
+    # one attack's version via _canonical_ontology_version (priority:
+    # print -> replay -> mask -> alphabetical), which is robust to configs
+    # that omit any given attack (e.g. mask-only runs).
+    _ontology_version = _canonical_ontology_version(attack_modules)
     sensor_preset = _SENSOR_REGISTRY[cfg["sensor_preset"]]
 
     items = enumerate_work_items(

@@ -17,3 +17,21 @@ def test_replay_ontology_loads():
     assert ont.attack_type == "replay"
     assert "device_class" in ont.axes
     assert "refresh_hz" in ont.axes
+
+
+def test_mask_ontology_loads():
+    ont = load_ontology(REPO_ROOT / "ontology" / "face" / "mask.yaml")
+    assert ont.attack_type == "mask"
+    # Version pin is intentional: the mask simulator (attacks/mask.py) and the
+    # spec tie behaviour to this ontology version. Bump both together if it changes.
+    assert ont.version == "2026-05-22"
+    assert set(ont.axes) == {
+        "mask_type",
+        "light_azimuth_deg",
+        "light_elevation_deg",
+        "specular_strength",
+        "aperture_misalignment_px",
+        "surface_warp",
+        "seam_visibility",
+    }
+    assert ont.axes["mask_type"].values == ["paper", "silicone", "resin"]
