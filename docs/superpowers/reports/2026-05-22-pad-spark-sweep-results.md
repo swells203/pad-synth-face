@@ -383,3 +383,38 @@ The spec §2 decision rule (`no cross-domain cell mean ≤ 0.001`) **passes for 
 - Mask-only per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mask/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask/summary.csv)
 - Integrated per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mix/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix/summary.csv)
 - Configs: `configs/runs/mask_set{a,b}_d{1,2,3}.yaml`, `configs/runs/mix_set{a,b}_d{1,2,3}.yaml`
+
+---
+
+## 2026-05-27 update — synth→real PILOT (AxonData free sample; harness validation, NOT a benchmark)
+
+First end-to-end run of the real-attack-capture harness (`docs/real-attack-capture.md`) on genuine captures. **This is a plumbing-grade pilot, not an authoritative benchmark — read the caveats first.**
+
+**Setup.** Train on the synthetic production base (`mix_seta_d{1,2,3}` = v2.1-print + DigiFace bonafide + replay + mask); evaluate on a real-attack eval set ingested from the **free AxonData HF sample** (CC-BY-NC-4.0). Real eval = **24 bonafide selfies + 31 attack frames** (12 print/cutout, 12 replay, 7 mask) — ffmpeg-extracted at 1 fps from 6 sample videos, ingested via `prepare_real_attack.py` to `datasets/_real_attack/axondata`. Same 27-cell sweep, GB10. Code SHA: `17bed5a`.
+
+**Synth→real cross-domain EER (mean ± std across 3 seeds):**
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1 (TinyCNN)** | 0.679 ± 0.082 | 0.564 ± 0.053 | 0.582 ± 0.000 |
+| **L2 (SmallCNN)** | 0.661 ± 0.087 | 0.612 ± 0.052 | 0.557 ± 0.109 |
+| **L3 (ResNet18)** | 0.552 ± 0.042 | 0.545 ± 0.122 | 0.570 ± 0.017 |
+
+(In-domain EER on the synthetic val split stays low — e.g. L3·D3 = 0.000 — so the detectors trained fine; the gap is purely synthetic→real transfer.)
+
+### Finding: the synthetic-trained detector does NOT transfer to real attacks
+
+Every cell sits at **0.545–0.679 EER — at or worse than chance (0.5)**. Contrast with the synth→synth numbers above: the same production base reaches ~0.09–0.25 cross-domain *within synthetic data* (mask-only L3·D3 = 0.089, integrated L2·D3 = 0.094), but **collapses to ≈chance on real captures**. The model learned the synthetic attack distribution (and the synthetic-bonafide/DigiFace distribution), not features that generalise to real print/replay/mask presentations under real cameras. This is the textbook synthetic→real domain gap and is exactly the result that put real-attack capture at the top of Phase 2.5: no amount of synthetic-only scaling closed it.
+
+### Caveats — why this is a pilot, not a benchmark
+
+- **Tiny, imbalanced eval (n=55).** 24 bonafide vs 31 attack, with attack frames drawn from only 6 videos at 1 fps (highly correlated within a clip). EER on this is high-variance; the std=0.000 cells are an artifact of the threshold landing identically on a handful of points, not stability.
+- **Vendor sample, not a standard benchmark.** AxonData's free 120-clip teaser, not OULU-NPU/Replay-Attack/SiW. No standard protocol, splits, or subject disjointness guarantees.
+- **CC-BY-NC** — non-commercial research only; recorded in the dataset's `provenance.jsonl`. Real images are **not** committed (gitignored under `datasets/_real_attack/`).
+
+**What this run does establish:** the harness works end-to-end on real data — folder-convention ingest → canonical layout → existing `spark_sweep` → synth→real EER — and gives a first directional signal (large gap). **An authoritative number needs a Tier-B EULA benchmark** run through the same, now-validated, path.
+
+### Raw results
+
+- Synth→real per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_synth2real/runs/`](./2026-05-22-pad-spark-sweep-results/runs_synth2real/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_synth2real/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_synth2real/summary.csv)
+- Dataset: AxonData face-anti-spoofing free sample (CC-BY-NC-4.0), ingested via `scripts/prepare_real_attack.py`; real images not committed.
