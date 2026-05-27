@@ -23,6 +23,16 @@ class BonafideIngested(BaseModel):
     ingested_at: datetime = Field(default_factory=_now)
 
 
+class RealAttackIngested(BaseModel):
+    type: Literal["real_attack_dataset_ingested"] = "real_attack_dataset_ingested"
+    name: str
+    license: str
+    source_url: str
+    sha256_of_index: str
+    attack_types: list[str]
+    ingested_at: datetime = Field(default_factory=_now)
+
+
 class GeneratorRegistered(BaseModel):
     type: Literal["generator_registered"] = "generator_registered"
     name: str
@@ -42,7 +52,9 @@ class OntologyCitation(BaseModel):
     url: str | None = None
 
 
-ProvenanceEvent = BonafideIngested | GeneratorRegistered | OntologyCitation
+ProvenanceEvent = (
+    BonafideIngested | GeneratorRegistered | OntologyCitation | RealAttackIngested
+)
 
 
 class ProvenanceLedger:
