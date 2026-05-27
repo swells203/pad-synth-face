@@ -42,7 +42,9 @@ _TARGET = (64, 64, 3)
 
 
 def _list_images(d: Path) -> list[Path]:
-    return sorted(p for p in d.rglob("*") if p.suffix.lower() in _EXTS)
+    return sorted(
+        p for p in d.rglob("*") if p.is_file() and p.suffix.lower() in _EXTS
+    )
 
 
 def _load_64(path: Path) -> np.ndarray:
