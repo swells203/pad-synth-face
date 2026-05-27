@@ -103,3 +103,34 @@ def build_extended_fixture_bonafide(root: Path) -> Path:
             arr = np.clip(arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
             Image.fromarray(arr).save(identity_dir / f"{sample}.png")
     return root
+
+
+def build_fixture_real_attack(root: Path) -> Path:
+    """Procedural folder-convention real-attack source for tests.
+
+    Layout: <root>/bonafide/subjectNN/*.png and
+    <root>/attack/<type>/subjectNN/*.png. Images are 96x96 RGB with
+    structured noise (std well above the QC floor) so the ingester's
+    resize and check_image_basic both exercise real work. No real data,
+    no PII -- purely synthetic stand-ins for the capture pipeline.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(20260527)
+    size = 96
+
+    def _emit(class_dir: Path, n_subjects: int, base_shift: int) -> None:
+        for s in range(n_subjects):
+            subj = class_dir / f"subject{s:02d}"
+            subj.mkdir(parents=True, exist_ok=True)
+            for k in range(2):
+                base = rng.integers(40, 200, size=3)
+                arr = np.tile(base, (size, size, 1)).astype(np.int16)
+                arr += rng.integers(-30, 30, size=(size, size, 3), dtype=np.int16)
+                arr += base_shift  # per-class tint so classes are separable
+                arr = np.clip(arr, 0, 255).astype(np.uint8)
+                Image.fromarray(arr).save(subj / f"{k}.png")
+
+    _emit(root / "bonafide", n_subjects=3, base_shift=0)
+    _emit(root / "attack" / "print", n_subjects=3, base_shift=-25)
+    _emit(root / "attack" / "replay", n_subjects=3, base_shift=25)
+    return root
