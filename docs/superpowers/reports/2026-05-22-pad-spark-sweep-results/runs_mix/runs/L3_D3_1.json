@@ -1,0 +1,19 @@
+{
+  "capacity": "L3",
+  "data_level": "D3",
+  "seed": 1,
+  "n_train": 3072,
+  "n_val_in_domain": 1024,
+  "n_val_cross_domain": 8192,
+  "eer_in_domain": 0.001953393257741084,
+  "eer_cross_domain": 0.079833984375,
+  "val_accuracy_in_domain": 0.998046875,
+  "val_accuracy_cross_domain": 0.9022216796875,
+  "train_seconds": 16.598393201828003,
+  "git_sha": "56e6218",
+  "torch_version": "2.12.0.dev20260407+cu128",
+  "cuda_version": "12.8",
+  "device": "cuda",
+  "train_root": "datasets/mix_seta_d3",
+  "eval_root": "datasets/mix_setb_d3"
+}

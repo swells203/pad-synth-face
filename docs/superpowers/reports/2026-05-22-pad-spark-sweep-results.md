@@ -320,3 +320,66 @@ The spec §10 criterion ("no cross-domain cell mean ≤ 0.001") **passes**: ever
 - Real-v2.1 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_real/`](./2026-05-22-pad-spark-sweep-results/runs_real/) (27 files)
 - Real-v2.1 summary CSV: [`./2026-05-22-pad-spark-sweep-results/summary_real.csv`](./2026-05-22-pad-spark-sweep-results/summary_real.csv)
 - Pinned identity lists: [`/configs/digiface_identities_seta.txt`](../../../configs/digiface_identities_seta.txt), [`/configs/digiface_identities_setb.txt`](../../../configs/digiface_identities_setb.txt)
+
+---
+
+## 2026-05-27 update — mask-attack module (DigiFace bonafide + v2.1 print held constant)
+
+The mask-attack module (paper / silicone / resin, 2D image-space physics) was added as a third attack on the v2.1-print + DigiFace-bonafide base. Both sweeps use the same Set A / Set B identity lists, sensors, and seeds as the real-bonafide sweep (Set A = mobile-front-2024 / seed 20260522, 8 IDs; Set B = webcam-1080p / seed 20260523, 16 IDs — the cross-domain shift spans sensor *and* identity). Two 27-cell sweeps on the GB10. Code SHA: `32d1920`. Torch: `2.12.0.dev20260407+cu128`. CUDA: 12.8.
+
+The mask physics was built with the v2/v2.1 artifact lesson designed in from the first commit — continuous float (no binary threshold / no colour quantisation), per-sample rng jitter on every spatial stage (texture-loss σ, shading/specular direction, aperture offset, drape warp, seam centre+radii). A byte-level sanity check confirmed two same-`mask_type` samples are byte-different before sweeping.
+
+### Deliverable 1 — mask-only cross-domain EER (mean ± std across 3 seeds)
+
+| | D1 (96/128) | D2 (512/1024) | D3 (4096/8192) |
+|---|---|---|---|
+| **L1 (TinyCNN)** | 0.302 ± 0.019 | 0.327 ± 0.009 | **0.248 ± 0.025** |
+| **L2 (SmallCNN)** | 0.286 ± 0.007 | 0.145 ± 0.035 | 0.094 ± 0.010 |
+| **L3 (ResNet18)** | 0.297 ± 0.044 | 0.145 ± 0.021 | **0.089 ± 0.022** |
+
+**Mask-only in-domain EER:**
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1** | 0.361 ± 0.137 | 0.346 ± 0.042 | 0.295 ± 0.033 |
+| **L2** | 0.305 ± 0.097 | 0.190 ± 0.030 | 0.006 ± 0.003 |
+| **L3** | 0.346 ± 0.079 | 0.010 ± 0.015 | 0.000 ± 0.000 |
+
+### Deliverable 2 — integrated print + replay + mask cross-domain EER (mean ± std)
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1 (TinyCNN)** | 0.401 ± 0.015 | 0.392 ± 0.020 | 0.347 ± 0.005 |
+| **L2 (SmallCNN)** | 0.411 ± 0.032 | 0.272 ± 0.057 | **0.094 ± 0.029** |
+| **L3 (ResNet18)** | 0.432 ± 0.007 | 0.125 ± 0.017 | 0.111 ± 0.024 |
+
+**Integrated in-domain EER:**
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1** | 0.265 ± 0.085 | 0.354 ± 0.036 | 0.271 ± 0.007 |
+| **L2** | 0.305 ± 0.097 | 0.292 ± 0.033 | 0.013 ± 0.002 |
+| **L3** | 0.389 ± 0.160 | 0.031 ± 0.013 | 0.016 ± 0.020 |
+
+### Artifact verdict: artifact-free (both sweeps)
+
+The spec §2 decision rule (`no cross-domain cell mean ≤ 0.001`) **passes for both sweeps**. Mask-only minimum cross-domain mean = **0.089** (L3·D3); integrated minimum = **0.094** (L2·D3). No cell collapses to the fake-perfect 0.000 that the synthetic-bonafide palette confound produced in v2/v2.1. The artifact discipline designed into the mask module held under a real GPU sweep — no third-strike fingerprint slipped in.
+
+### Findings
+
+1. **Mask is a genuine, harder-than-print cue.** The print-comparable cell mask-only **L1·D3 = 0.248** sits above print's 0.178 headline — masks at 64×64 are a more diffuse signal than print's high-frequency artifacts, so TinyCNN separates them less cleanly. But the cue is real and transfers: at higher capacity/data it drops to **L3·D3 = 0.089 / L2·D3 = 0.094**.
+2. **Data axis dominates, consistent with every prior sweep.** D1→D3 drops cross-domain EER by ~0.2 at L2/L3 (e.g. L3: 0.297 → 0.089). Capacity helps only at D2+; at D1 all three capacities are indistinguishable (~0.29–0.30), i.e. 96–128 samples are too few to learn the mask cue against real-face variability.
+3. **L3 over-memorises in-domain again.** L3·D2 and L3·D3 hit 0.000 in-domain while cross-domain stays at 0.089–0.145 — the same generalization-gap signature seen with print. TinyCNN/SmallCNN remain the deployment-sensible choices; L3 stays demoted.
+4. **The integrated mix is harder at low data, converges at D3.** Adding mask alongside print+replay raises cross-domain EER at D1/D2 (the detector must separate three attack distributions from bonafide with the same data budget — L1·D1 = 0.401 vs mask-only 0.302), but by D3 the blended detector reaches **L2·D3 = 0.094**, matching the mask-only best. More attack diversity costs data, not achievable accuracy.
+
+### Phase 2 recommendation update
+
+- **Ship mask as a production attack class.** It produces a plausible, artifact-free cross-domain number and composes cleanly with print+replay at D3. The "designed-in discipline" approach worked first-try — no v2-style remediation cycle was needed.
+- **Real attack capture stays the top Phase 2.5 lever.** Mask is still synthetic 2D-image-space; the residual at D3 and the L3 in-domain memorisation point at the same synthetic-attack ceiling that real captures would lift.
+- **L3 ResNet18 stays demoted;** TinyCNN/SmallCNN at D3 are the deployment models.
+
+### Raw results
+
+- Mask-only per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mask/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask/summary.csv)
+- Integrated per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mix/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix/summary.csv)
+- Configs: `configs/runs/mask_set{a,b}_d{1,2,3}.yaml`, `configs/runs/mix_set{a,b}_d{1,2,3}.yaml`
