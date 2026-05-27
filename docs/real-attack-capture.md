@@ -57,3 +57,40 @@ eval side at the ingested real dir for every data level:
 This trains on synthetic at increasing data scale and evaluates on the fixed
 real set — the headline synth→real EER curve. Append the result table to the
 sweep-results report.
+
+## 4. Running on the DGX Spark
+
+The sweep needs the GB10 GPU; generation and ingestion are CPU steps. Datasets
+are gitignored, so they are built on a machine that has the source data and
+then synced to the Spark — the Spark's repo copy is updated by rsync, not git
+(its SSH key is a deploy key for a different repo and can't pull this one).
+
+1. **On the machine with the data (the laptop):** generate the synthetic base
+   and ingest the real dataset.
+   ```bash
+   for d in 1 2 3; do
+     python -m pad_synth_face.cli generate --config configs/runs/mix_seta_d$d.yaml
+   done
+   python scripts/prepare_real_attack.py --src <frames> \
+     --out datasets/_real_attack/<dataset> \
+     --dataset-name "<NAME>" --license "<EULA>" --source-url "<url>"
+   ```
+
+2. **Sync code + datasets to the Spark** (`swells@spark-50d2.local`, project at
+   `~/ml/projects/pad-spark`):
+   ```bash
+   rsync -az --exclude='.venv' --exclude='.git' --exclude='datasets' \
+     ./ swells@spark-50d2.local:~/ml/projects/pad-spark/
+   rsync -az datasets/mix_seta_d1 datasets/mix_seta_d2 datasets/mix_seta_d3 \
+     datasets/_real_attack/<dataset> \
+     swells@spark-50d2.local:~/ml/projects/pad-spark/datasets/
+   ```
+
+3. **Run the §3 sweep on the Spark** via its venv:
+   `ssh swells@spark-50d2.local 'cd ~/ml/projects/pad-spark && .venv/bin/python scripts/spark_sweep.py ...'`.
+   The `--set-*-d4` args are required by the parser even though no D4 cells are
+   requested — point them at the D3 dirs. A 27-cell sweep is ~3–5 min on the GB10.
+
+4. **Pull results back** (`rsync` the `runs_synth2real/` dir to the laptop) and
+   append the cross-domain EER table to the sweep-results report. Real images
+   themselves are never committed — only the per-cell JSON/CSV results are.
