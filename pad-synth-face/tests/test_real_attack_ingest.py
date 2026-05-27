@@ -34,7 +34,7 @@ def test_canonical_layout_and_counts(tmp_path):
 
 def test_manifest_labels_and_attack_type(tmp_path):
     out, _ = _ingest(tmp_path)
-    recs = [json.loads(l) for l in (out / "manifest.jsonl").read_text().splitlines()]
+    recs = [json.loads(line) for line in (out / "manifest.jsonl").read_text().splitlines()]
     by_label = {}
     for r in recs:
         by_label.setdefault(r["label"], []).append(r)
@@ -48,7 +48,7 @@ def test_manifest_labels_and_attack_type(tmp_path):
 
 def test_provenance_event_written(tmp_path):
     out, _ = _ingest(tmp_path)
-    prov = [json.loads(l) for l in (out / "provenance.jsonl").read_text().splitlines()]
+    prov = [json.loads(line) for line in (out / "provenance.jsonl").read_text().splitlines()]
     ra = [e for e in prov if e["type"] == "real_attack_dataset_ingested"]
     assert len(ra) == 1
     assert ra[0]["name"] == "FIXTURE-RA"
@@ -72,7 +72,7 @@ def test_idempotent_and_deterministic(tmp_path):
     assert s2["counts"] == {"bonafide": 0, "print": 0, "replay": 0}
     assert digest() == d1
     assert s1["counts"] == {"bonafide": 6, "print": 6, "replay": 6}
-    prov = [json.loads(l) for l in (out / "provenance.jsonl").read_text().splitlines()]
+    prov = [json.loads(line) for line in (out / "provenance.jsonl").read_text().splitlines()]
     ra = [e for e in prov if e["type"] == "real_attack_dataset_ingested"]
     assert len(ra) == 1  # second (no-op) run recorded no new event
 
