@@ -71,6 +71,60 @@ class TinyPADDataset(Dataset):
         return tensor, label
 
 
+def subject_disjoint_split(
+    dataset: "TinyPADDataset",
+    val_fraction: float,
+    seed: int,
+) -> tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
+    """Split a TinyPADDataset into (train, val) with disjoint subjects.
+
+    Groups samples by `dataset.subjects` and assigns whole identities to the
+    val side until the running val count reaches roughly `val_fraction` of
+    the dataset. Samples with subject=None go to train (no leakage risk).
+    Falls back to torch's random_split when every subject is None
+    (preserves current behaviour for manifest-less datasets).
+    """
+    n = len(dataset)
+    n_val_target = max(1, int(round(n * val_fraction)))
+    n_train_target = max(1, n - n_val_target)
+
+    subjects = getattr(dataset, "subjects", [None] * n)
+    if not subjects or all(s is None for s in subjects):
+        return torch.utils.data.random_split(
+            dataset, [n_train_target, n_val_target],
+            generator=torch.Generator().manual_seed(seed),
+        )
+
+    by_subj: dict[str, list[int]] = {}
+    no_subj: list[int] = []
+    for i, s in enumerate(subjects):
+        if s is None:
+            no_subj.append(i)
+        else:
+            by_subj.setdefault(s, []).append(i)
+
+    rng = np.random.default_rng(seed)
+    order = list(by_subj.keys())
+    rng.shuffle(order)
+
+    val_idx: list[int] = []
+    val_subjects: set[str] = set()
+    for s in order:
+        if len(val_idx) >= n_val_target:
+            break
+        val_idx.extend(by_subj[s])
+        val_subjects.add(s)
+
+    train_idx = sorted(
+        no_subj + [i for s in order if s not in val_subjects for i in by_subj[s]]
+    )
+    val_idx = sorted(val_idx)
+    return (
+        torch.utils.data.Subset(dataset, train_idx),
+        torch.utils.data.Subset(dataset, val_idx),
+    )
+
+
 class TinyCNN(nn.Module):
     def __init__(self) -> None:
         super().__init__()
