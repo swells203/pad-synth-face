@@ -52,8 +52,24 @@ class OntologyCitation(BaseModel):
     url: str | None = None
 
 
+class DFDCBonafideIngested(BaseModel):
+    type: Literal["dfdc_bonafide_dataset_ingested"] = "dfdc_bonafide_dataset_ingested"
+    license: str
+    source_url: str
+    n_chunks: int
+    n_videos: int
+    n_frames_written: int
+    detection_rate: float
+    real_filenames_sha256: str
+    ingested_at: datetime = Field(default_factory=_now)
+
+
 ProvenanceEvent = (
-    BonafideIngested | GeneratorRegistered | OntologyCitation | RealAttackIngested
+    BonafideIngested
+    | GeneratorRegistered
+    | OntologyCitation
+    | RealAttackIngested
+    | DFDCBonafideIngested
 )
 
 
