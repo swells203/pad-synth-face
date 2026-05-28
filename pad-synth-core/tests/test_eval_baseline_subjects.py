@@ -141,6 +141,34 @@ def test_train_and_eval_returns_iso_metrics(tmp_path):
     assert 0.0 <= out["bpcer_cross_domain"] <= 1.0
     assert 0.0 <= out["acer_cross_domain"] <= 1.0
     assert isinstance(out["apcer_per_pai_cross_domain"], dict)
+    assert out["threshold"] is not None and 0.0 <= out["threshold"] <= 2.0
     # Old keys still present and finite.
+    assert 0.0 <= out["eer_in_domain"] <= 1.0
+    assert 0.0 <= out["eer_cross_domain"] <= 1.0
+
+
+def test_iso_metrics_are_none_when_dev_has_no_pai_metadata(tmp_path):
+    """Manifest-less train_root -> dev_atypes all None -> ISO metrics return
+    None (not a misleading sentinel). Threshold-free EER stays meaningful."""
+    # Manifest-less synthetic train set.
+    train_root = tmp_path / "train_no_manifest"
+    for i in range(8):
+        _img(train_root / f"face/bonafide/b{i}.jpg", i)
+        _img(train_root / f"face/print/p{i}.jpg", i + 100)
+    # Eval set WITH manifest (so per-PAI APCER would otherwise be computable).
+    eval_ds = _build_ds(tmp_path / "eval")
+    eval_root = Path(eval_ds.items[0][0]).parents[2]
+
+    out = train_and_cross_domain_eval(
+        train_root=train_root, eval_root=eval_root,
+        epochs=1, batch_size=4, seed=0, device="cpu",
+    )
+    # ISO metrics not computable without dev PAI metadata.
+    assert out["threshold"] is None
+    assert out["apcer_cross_domain"] is None
+    assert out["bpcer_cross_domain"] is None
+    assert out["acer_cross_domain"] is None
+    assert out["apcer_per_pai_cross_domain"] is None
+    # But threshold-free EER still works.
     assert 0.0 <= out["eer_in_domain"] <= 1.0
     assert 0.0 <= out["eer_cross_domain"] <= 1.0

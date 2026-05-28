@@ -85,7 +85,10 @@ def subject_disjoint_split(
     (preserves current behaviour for manifest-less datasets).
     """
     n = len(dataset)
-    n_val_target = max(1, int(round(n * val_fraction)))
+    # int(n * val_fraction) matches the pre-feature n // 4 for val_fraction=0.25
+    # at every n, so manifest-less datasets get the exact same partition as
+    # before (preserves numerical back-compat for existing sweep reports).
+    n_val_target = max(1, int(n * val_fraction))
     n_train_target = max(1, n - n_val_target)
 
     subjects = getattr(dataset, "subjects", [None] * n)
@@ -204,7 +207,16 @@ def train_and_cross_domain_eval(
     in_acc = (
         sum(int((s >= 0.5) == y) for s, y in zip(dev_scores, dev_labels, strict=True)) / max(len(dev_scores), 1)
     )
-    threshold, _ = threshold_at_apcer(dev_scores, dev_labels, dev_atypes, target_apcer)
+
+    # ISO threshold needs PAI metadata on the dev set. Without it we'd pick a
+    # trivial sentinel and produce numbers indistinguishable from model
+    # collapse -- return None instead so callers can tell "not computable"
+    # from a real result. Threshold-free EER stays meaningful either way.
+    dev_has_pai = any(t is not None for t in dev_atypes)
+    threshold: float | None = None
+    if dev_has_pai:
+        thr, _ = threshold_at_apcer(dev_scores, dev_labels, dev_atypes, target_apcer)
+        threshold = float(thr)
 
     cross_eer: float | None = None
     cross_acc: float | None = None
@@ -222,9 +234,10 @@ def train_and_cross_domain_eval(
             / max(len(cross_scores), 1)
         )
         n_val_cross = len(cross_ds)
-        apcer_per_pai, apcer_max, bpcer, acer = apcer_bpcer_acer(
-            cross_scores, cross_labels, cross_atypes, threshold,
-        )
+        if threshold is not None:
+            apcer_per_pai, apcer_max, bpcer, acer = apcer_bpcer_acer(
+                cross_scores, cross_labels, cross_atypes, threshold,
+            )
 
     return {
         # Existing keys -- preserved.
@@ -235,8 +248,10 @@ def train_and_cross_domain_eval(
         "eer_cross_domain": cross_eer,
         "val_accuracy_cross_domain": cross_acc,
         "n_val_cross_domain": n_val_cross,
-        # New additive keys.
-        "threshold": float(threshold),
+        # New additive keys. threshold/apcer/bpcer/acer are None when the dev
+        # split lacks PAI metadata (manifest-less train_root) -- signals
+        # "not computable" rather than emitting a misleading sentinel.
+        "threshold": threshold,
         "target_apcer": float(target_apcer),
         "apcer_cross_domain": apcer_max,
         "bpcer_cross_domain": bpcer,
