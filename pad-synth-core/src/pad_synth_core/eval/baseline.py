@@ -16,6 +16,8 @@ from PIL import Image
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
+from pad_synth_core.eval.metrics import compute_eer  # re-exported for backward compatibility
+
 
 class TinyPADDataset(Dataset):
     def __init__(self, root: Path) -> None:
@@ -57,27 +59,6 @@ class TinyCNN(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
-
-
-def compute_eer(scores: list[float], labels: list[int]) -> float:
-    s = np.asarray(scores, dtype=np.float64)
-    y = np.asarray(labels, dtype=np.int64)
-    thresholds = np.unique(s)
-    best = 1.0
-    eer = 0.5
-    for t in thresholds:
-        pred = (s >= t).astype(np.int64)
-        fp = float(((pred == 1) & (y == 0)).sum())
-        fn = float(((pred == 0) & (y == 1)).sum())
-        n_pos = max(int((y == 1).sum()), 1)
-        n_neg = max(int((y == 0).sum()), 1)
-        fpr = fp / n_neg
-        fnr = fn / n_pos
-        diff = abs(fpr - fnr)
-        if diff < best:
-            best = diff
-            eer = (fpr + fnr) / 2.0
-    return float(eer)
 
 
 def _eval_loader(
