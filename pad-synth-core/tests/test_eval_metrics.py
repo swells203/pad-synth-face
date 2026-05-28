@@ -68,3 +68,9 @@ def test_threshold_at_apcer_trivially_low_with_attacks_only_above_budget():
     thr, achieved = threshold_at_apcer(scores, labels, types, target_apcer=0.05)
     assert achieved <= 0.05 + 1e-9
     assert math.isfinite(thr)
+
+
+def test_threshold_at_apcer_rejects_negative_target():
+    import pytest
+    with pytest.raises(ValueError, match="non-negative"):
+        threshold_at_apcer([0.1, 0.9], [0, 1], [None, "print"], target_apcer=-0.01)
