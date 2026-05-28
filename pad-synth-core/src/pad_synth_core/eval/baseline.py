@@ -7,6 +7,7 @@ real eval set is a `dataset_root` change.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Callable
 
@@ -22,16 +23,43 @@ from pad_synth_core.eval.metrics import compute_eer  # re-exported for backward 
 class TinyPADDataset(Dataset):
     def __init__(self, root: Path) -> None:
         self.items: list[tuple[Path, int]] = []
-        face_root = root / "face"
+        self.subjects: list[str | None] = []
+        self.attack_types: list[str | None] = []
+        face_root = Path(root) / "face"
+
+        # Manifest provides per-sample subject + attack_type when present;
+        # absent or unparseable -> graceful (subjects/attack_types stay None,
+        # callers fall back to random splits).
+        by_output_path: dict[str, tuple[str | None, str | None]] = {}
+        manifest_path = Path(root) / "manifest.jsonl"
+        if manifest_path.exists():
+            for line in manifest_path.read_text().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    subj = (rec.get("bonafide_source") or {}).get("id")
+                    by_output_path[rec["output_path"]] = (subj, rec.get("attack_type"))
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
+        def _add(path: Path, label: int) -> None:
+            self.items.append((path, label))
+            rel = str(path.relative_to(Path(root)))
+            subj, atype = by_output_path.get(rel, (None, None))
+            self.subjects.append(subj)
+            self.attack_types.append(atype)
+
         # Bonafide samples live under face/bonafide/.
         for p in sorted((face_root / "bonafide").glob("*.jpg")):
-            self.items.append((p, 0))
+            _add(p, 0)
         # All other face/<x>/ subdirectories are attack types (print, replay, ...).
         for subdir in sorted(p for p in face_root.iterdir() if p.is_dir()):
             if subdir.name == "bonafide":
                 continue
             for p in sorted(subdir.glob("*.jpg")):
-                self.items.append((p, 1))
+                _add(p, 1)
 
     def __len__(self) -> int:
         return len(self.items)
