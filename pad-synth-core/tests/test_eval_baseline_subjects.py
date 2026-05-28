@@ -116,3 +116,34 @@ def test_subject_disjoint_split_falls_back_to_random_without_manifest(tmp_path):
     # Both are torch.utils.data.Subset (random_split also returns Subsets in modern torch).
     assert isinstance(train, torch.utils.data.Subset)
     assert isinstance(val, torch.utils.data.Subset)
+
+
+from pad_synth_core.eval.baseline import train_and_cross_domain_eval
+
+
+def test_train_and_eval_returns_iso_metrics(tmp_path):
+    # Train set with a manifest -> subject-disjoint split engages.
+    train_ds = _build_ds(tmp_path / "train")
+    train_root = Path(train_ds.items[0][0]).parents[2]  # face/<x>/<file>.jpg -> root
+    # Cross-domain eval set with its own manifest.
+    eval_ds = _build_ds(tmp_path / "eval")
+    eval_root = Path(eval_ds.items[0][0]).parents[2]
+
+    out = train_and_cross_domain_eval(
+        train_root=train_root, eval_root=eval_root,
+        epochs=1, batch_size=4, seed=0, device="cpu",
+        target_apcer=0.05,
+    )
+    # New additive keys.
+    for k in ("threshold", "target_apcer",
+              "apcer_cross_domain", "bpcer_cross_domain", "acer_cross_domain",
+              "apcer_per_pai_cross_domain"):
+        assert k in out, f"missing new key {k!r}"
+    assert out["target_apcer"] == 0.05
+    assert 0.0 <= out["apcer_cross_domain"] <= 1.0
+    assert 0.0 <= out["bpcer_cross_domain"] <= 1.0
+    assert 0.0 <= out["acer_cross_domain"] <= 1.0
+    assert isinstance(out["apcer_per_pai_cross_domain"], dict)
+    # Old keys still present and finite.
+    assert 0.0 <= out["eer_in_domain"] <= 1.0
+    assert 0.0 <= out["eer_cross_domain"] <= 1.0

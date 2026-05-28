@@ -17,7 +17,7 @@ from PIL import Image
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
-from pad_synth_core.eval.metrics import compute_eer  # re-exported for backward compatibility
+from pad_synth_core.eval.metrics import apcer_bpcer_acer, compute_eer, threshold_at_apcer  # noqa: F401  (compute_eer re-exported)
 
 
 class TinyPADDataset(Dataset):
@@ -143,26 +143,23 @@ class TinyCNN(nn.Module):
         return self.net(x)
 
 
-def _eval_loader(
-    model: nn.Module, dl: DataLoader, device: torch.device | None = None
-) -> tuple[float, float]:
-    """Run a model over a dataloader; return (EER, accuracy)."""
-    dev = device or torch.device("cpu")
+def _score_dataset(model, dataset, batch_size, device):
+    """Run inference and return (scores, labels, attack_types) aligned 1:1
+    with the dataset (or Subset) order, with no shuffling."""
+    dl = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     scores: list[float] = []
     labels: list[int] = []
-    correct = 0
-    total = 0
     with torch.no_grad():
         for x, y in dl:
-            x, y = x.to(dev), y.to(dev)
-            logits = model(x)
-            probs = torch.softmax(logits, dim=1)[:, 1].cpu().tolist()
+            x = x.to(device)
+            probs = torch.softmax(model(x), dim=1)[:, 1].cpu().tolist()
             scores.extend(probs)
-            labels.extend(y.cpu().tolist())
-            preds = logits.argmax(dim=1)
-            correct += int((preds == y).sum())
-            total += int(y.numel())
-    return compute_eer(scores, labels), correct / max(total, 1)
+            labels.extend(y.tolist())
+    if isinstance(dataset, torch.utils.data.Subset):
+        attack_types = [dataset.dataset.attack_types[i] for i in dataset.indices]
+    else:
+        attack_types = list(dataset.attack_types)
+    return scores, labels, attack_types
 
 
 def train_and_cross_domain_eval(
@@ -173,28 +170,20 @@ def train_and_cross_domain_eval(
     seed: int = 0,
     device: str | None = None,
     model_factory: Callable[[], nn.Module] | None = None,
+    target_apcer: float = 0.05,
 ) -> dict[str, Any]:
-    """Train on train_root; eval in-domain (held-out 25 percent split) and
-    optionally cross-domain (full eval_root if provided).
-
-    Defaults preserve the Phase 1/1.5 behavior (TinyCNN on CPU). Pass
-    `device="cuda"` and `model_factory=make_small_cnn` etc. for the
-    Spark scaling sweep.
-
-    Returns the same dict shape as before, with all numeric fields finite.
-    """
+    """Train on train_root; eval in-domain (held-out 25 percent split, now
+    subject-disjoint when a manifest is present) and optionally cross-domain
+    (full eval_root if provided). Adds ISO 30107-3 metrics at a dev-fixed
+    threshold (target APCER = `target_apcer`) on top of the existing EER
+    reporting -- all new keys are additive."""
     torch.manual_seed(seed)
     dev = torch.device(device) if device else torch.device("cpu")
 
     train_ds_full = TinyPADDataset(train_root)
-    n_val = max(1, len(train_ds_full) // 4)
-    n_train = len(train_ds_full) - n_val
-    train_ds, val_ds = torch.utils.data.random_split(
-        train_ds_full, [n_train, n_val],
-        generator=torch.Generator().manual_seed(seed),
-    )
+    train_ds, val_ds = subject_disjoint_split(train_ds_full, val_fraction=0.25, seed=seed)
+    n_train, n_val = len(train_ds), len(val_ds)
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_dl = DataLoader(val_ds, batch_size=batch_size)
 
     model = (model_factory or TinyCNN)().to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -209,18 +198,36 @@ def train_and_cross_domain_eval(
             opt.step()
 
     model.eval()
-    in_eer, in_acc = _eval_loader(model, val_dl, dev)
+    # In-domain scoring (dev split).
+    dev_scores, dev_labels, dev_atypes = _score_dataset(model, val_ds, batch_size, dev)
+    in_eer = compute_eer(dev_scores, dev_labels)
+    in_acc = (
+        sum(int((s >= 0.5) == y) for s, y in zip(dev_scores, dev_labels)) / max(len(dev_scores), 1)
+    )
+    threshold, _ = threshold_at_apcer(dev_scores, dev_labels, dev_atypes, target_apcer)
 
     cross_eer: float | None = None
     cross_acc: float | None = None
     n_val_cross: int | None = None
+    apcer_per_pai: dict[str, float] | None = None
+    apcer_max: float | None = None
+    bpcer: float | None = None
+    acer: float | None = None
     if eval_root is not None:
         cross_ds = TinyPADDataset(eval_root)
-        cross_dl = DataLoader(cross_ds, batch_size=batch_size)
-        cross_eer, cross_acc = _eval_loader(model, cross_dl, dev)
+        cross_scores, cross_labels, cross_atypes = _score_dataset(model, cross_ds, batch_size, dev)
+        cross_eer = compute_eer(cross_scores, cross_labels)
+        cross_acc = (
+            sum(int((s >= 0.5) == y) for s, y in zip(cross_scores, cross_labels))
+            / max(len(cross_scores), 1)
+        )
         n_val_cross = len(cross_ds)
+        apcer_per_pai, apcer_max, bpcer, acer = apcer_bpcer_acer(
+            cross_scores, cross_labels, cross_atypes, threshold,
+        )
 
     return {
+        # Existing keys -- preserved.
         "eer_in_domain": in_eer,
         "val_accuracy_in_domain": in_acc,
         "n_train": n_train,
@@ -228,6 +235,13 @@ def train_and_cross_domain_eval(
         "eer_cross_domain": cross_eer,
         "val_accuracy_cross_domain": cross_acc,
         "n_val_cross_domain": n_val_cross,
+        # New additive keys.
+        "threshold": float(threshold),
+        "target_apcer": float(target_apcer),
+        "apcer_cross_domain": apcer_max,
+        "bpcer_cross_domain": bpcer,
+        "acer_cross_domain": acer,
+        "apcer_per_pai_cross_domain": apcer_per_pai,
     }
 
 
