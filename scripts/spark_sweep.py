@@ -129,7 +129,12 @@ def main() -> None:
             "train_root": str(train_root),
             "eval_root": str(eval_root),
             # ISO 30107-3 metrics at the dev-fixed threshold (target APCER 5%).
-            "threshold": float(out["threshold"]),
+            # threshold is None when the train_root has no manifest (no PAI
+            # metadata to choose an operating point on) -- the ISO scalars
+            # below all become None in that case.
+            "threshold": (
+                float(out["threshold"]) if out["threshold"] is not None else None
+            ),
             "target_apcer": float(out["target_apcer"]),
             "apcer_cross_domain": (
                 float(out["apcer_cross_domain"])
