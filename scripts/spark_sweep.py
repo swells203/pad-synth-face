@@ -82,8 +82,11 @@ def main() -> None:
     summary_path = args.output_dir / "summary.csv"
     with summary_path.open("w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["capacity", "data_level", "seed", "eer_in_domain",
-                    "eer_cross_domain", "train_seconds"])
+        w.writerow([
+            "capacity", "data_level", "seed",
+            "eer_in_domain", "eer_cross_domain", "train_seconds",
+            "acer_cross_domain", "apcer_cross_domain", "bpcer_cross_domain", "threshold",
+        ])
 
     for L, D, seed in cells:
         train_root = set_roots[("a", D)]
@@ -125,6 +128,22 @@ def main() -> None:
             "device": args.device,
             "train_root": str(train_root),
             "eval_root": str(eval_root),
+            # ISO 30107-3 metrics at the dev-fixed threshold (target APCER 5%).
+            "threshold": float(out["threshold"]),
+            "target_apcer": float(out["target_apcer"]),
+            "apcer_cross_domain": (
+                float(out["apcer_cross_domain"])
+                if out["apcer_cross_domain"] is not None else None
+            ),
+            "bpcer_cross_domain": (
+                float(out["bpcer_cross_domain"])
+                if out["bpcer_cross_domain"] is not None else None
+            ),
+            "acer_cross_domain": (
+                float(out["acer_cross_domain"])
+                if out["acer_cross_domain"] is not None else None
+            ),
+            "apcer_per_pai_cross_domain": out["apcer_per_pai_cross_domain"],
         }
         out_path = runs_dir / f"{L}_{D}_{seed}.json"
         out_path.write_text(json.dumps(rec, indent=2))
@@ -132,6 +151,8 @@ def main() -> None:
             csv.writer(fh).writerow([
                 L, D, seed, rec["eer_in_domain"], rec["eer_cross_domain"],
                 f"{elapsed:.2f}",
+                rec["acer_cross_domain"], rec["apcer_cross_domain"],
+                rec["bpcer_cross_domain"], rec["threshold"],
             ])
         ec = rec["eer_cross_domain"]
         ec_s = f"{ec:.3f}" if ec is not None else "N/A"
