@@ -72,7 +72,7 @@ class TinyPADDataset(Dataset):
 
 
 def subject_disjoint_split(
-    dataset: "TinyPADDataset",
+    dataset: TinyPADDataset,
     val_fraction: float,
     seed: int,
 ) -> tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
@@ -202,7 +202,7 @@ def train_and_cross_domain_eval(
     dev_scores, dev_labels, dev_atypes = _score_dataset(model, val_ds, batch_size, dev)
     in_eer = compute_eer(dev_scores, dev_labels)
     in_acc = (
-        sum(int((s >= 0.5) == y) for s, y in zip(dev_scores, dev_labels)) / max(len(dev_scores), 1)
+        sum(int((s >= 0.5) == y) for s, y in zip(dev_scores, dev_labels, strict=True)) / max(len(dev_scores), 1)
     )
     threshold, _ = threshold_at_apcer(dev_scores, dev_labels, dev_atypes, target_apcer)
 
@@ -218,7 +218,7 @@ def train_and_cross_domain_eval(
         cross_scores, cross_labels, cross_atypes = _score_dataset(model, cross_ds, batch_size, dev)
         cross_eer = compute_eer(cross_scores, cross_labels)
         cross_acc = (
-            sum(int((s >= 0.5) == y) for s, y in zip(cross_scores, cross_labels))
+            sum(int((s >= 0.5) == y) for s, y in zip(cross_scores, cross_labels, strict=True))
             / max(len(cross_scores), 1)
         )
         n_val_cross = len(cross_ds)

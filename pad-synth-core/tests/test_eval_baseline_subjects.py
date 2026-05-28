@@ -2,9 +2,14 @@ import json
 from pathlib import Path
 
 import numpy as np
+import torch
 from PIL import Image
 
-from pad_synth_core.eval.baseline import TinyPADDataset
+from pad_synth_core.eval.baseline import (
+    TinyPADDataset,
+    subject_disjoint_split,
+    train_and_cross_domain_eval,
+)
 
 
 def _img(path: Path, seed: int) -> None:
@@ -48,7 +53,7 @@ def test_dataset_populates_subjects_and_attack_types_from_manifest(tmp_path):
     assert len(ds) == 4
     # Parallel attribute lists, indexed identically to ds.items.
     paths = [str(p) for p, _ in ds.items]
-    by_path = dict(zip(paths, zip(ds.subjects, ds.attack_types)))
+    by_path = dict(zip(paths, zip(ds.subjects, ds.attack_types, strict=True), strict=True))
     assert by_path[str(root / "face" / "bonafide" / "b0.jpg")] == ("subject_A", None)
     assert by_path[str(root / "face" / "bonafide" / "b1.jpg")] == ("subject_B", None)
     assert by_path[str(root / "face" / "print"    / "p0.jpg")] == ("subject_A", "print")
@@ -63,11 +68,6 @@ def test_dataset_without_manifest_has_all_none(tmp_path):
     assert len(ds) == 2
     assert ds.subjects == [None, None]
     assert ds.attack_types == [None, None]
-
-
-import torch
-
-from pad_synth_core.eval.baseline import subject_disjoint_split
 
 
 def _build_ds(tmp_path, n_subjects=6, samples_per=3):
@@ -116,9 +116,6 @@ def test_subject_disjoint_split_falls_back_to_random_without_manifest(tmp_path):
     # Both are torch.utils.data.Subset (random_split also returns Subsets in modern torch).
     assert isinstance(train, torch.utils.data.Subset)
     assert isinstance(val, torch.utils.data.Subset)
-
-
-from pad_synth_core.eval.baseline import train_and_cross_domain_eval
 
 
 def test_train_and_eval_returns_iso_metrics(tmp_path):

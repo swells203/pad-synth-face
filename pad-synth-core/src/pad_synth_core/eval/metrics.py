@@ -25,7 +25,7 @@ training loop.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -77,10 +77,10 @@ def apcer_bpcer_acer(
     types = list(attack_types)
 
     # Per-PAI APCER.
-    pai_species = sorted({t for t, lab in zip(types, y) if lab == 1 and t is not None})
+    pai_species = sorted({t for t, lab in zip(types, y, strict=True) if lab == 1 and t is not None})
     apcer_per_pai: dict[str, float] = {}
     for pai in pai_species:
-        mask = np.array([lab == 1 and t == pai for t, lab in zip(types, y)])
+        mask = np.array([lab == 1 and t == pai for t, lab in zip(types, y, strict=True)])
         n = int(mask.sum())
         if n == 0:
             continue
