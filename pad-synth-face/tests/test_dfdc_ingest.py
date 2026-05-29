@@ -1,6 +1,5 @@
 import json
 import shutil
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -162,7 +161,7 @@ def test_multi_chunk_discovery(tmp_path):
     for chunk_i in range(2):
         chunk = src / f"chunk_{chunk_i:02d}"
         chunk.mkdir(parents=True)
-        for v_i, label in enumerate(("REAL", "REAL")):
+        for v_i, _label in enumerate(("REAL", "REAL")):
             name = f"chunk{chunk_i}_video{v_i}.mp4"
             subprocess.run(
                 ["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi",
