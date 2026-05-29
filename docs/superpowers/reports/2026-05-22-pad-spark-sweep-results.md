@@ -420,3 +420,83 @@ Every cell sits at **0.545–0.679 EER — at or worse than chance (0.5)**. Cont
 
 - Synth→real per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_synth2real/runs/`](./2026-05-22-pad-spark-sweep-results/runs_synth2real/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_synth2real/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_synth2real/summary.csv)
 - Dataset: AxonData face-anti-spoofing free sample (CC-BY-NC-4.0), ingested via `scripts/prepare_real_attack.py`; real images not committed.
+
+---
+
+## 2026-05-29 update — A1 resolution bump (64×64 → 224×224, mask-only + integrated; sensor unchanged)
+
+First sweep at the new canonical 224×224 baseline established by the A1 resolution bump (commit `784f739`). Synthetic attacks regenerated at 224 via the image-fraction physics retune (print halftone cells, replay subpixel pitch + moiré freq derived from `rgb.shape[0]`); mask physics already fraction-based. DigiFace bonafide re-prepped to 224 via `prepare_digiface.py --size 224`. Same 27-cell sweep, GB10. Code SHA: `784f739`. Sweep wall-time: ~7.5 min (mask) + ~90 s (mix) — the GB10 handles 224×224 + the small models comfortably.
+
+### Mask-only cross-domain EER @ 224 (mean ± std across 3 seeds)
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1 (TinyCNN)** | 0.323 ± 0.007 | 0.343 ± 0.011 | 0.328 ± 0.042 |
+| **L2 (SmallCNN)** | 0.312 ± 0.022 | 0.343 ± 0.054 | 0.336 ± 0.013 |
+| **L3 (ResNet18)** | 0.583 ± 0.063 | 0.292 ± 0.021 | **0.291 ± 0.020** |
+
+**Mask-only in-domain EER @ 224:**
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1** | 0.417 ± 0.068 | 0.495 ± 0.007 | 0.540 ± 0.085 |
+| **L2** | 0.417 ± 0.118 | 0.521 ± 0.116 | 0.655 ± 0.007 |
+| **L3** | 0.444 ± 0.142 | 0.349 ± 0.063 | 0.465 ± 0.096 |
+
+### Integrated print+replay+mask cross-domain EER @ 224 (mean ± std)
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1 (TinyCNN)** | 0.354 ± 0.007 | 0.352 ± 0.008 | 0.358 ± 0.019 |
+| **L2 (SmallCNN)** | 0.312 ± 0.026 | 0.294 ± 0.002 | **0.194 ± 0.005** |
+| **L3 (ResNet18)** | 0.323 ± 0.027 | 0.264 ± 0.046 | 0.225 ± 0.008 |
+
+**Integrated in-domain EER @ 224:**
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **L1** | 0.333 ± 0.000 | 0.401 ± 0.121 | 0.464 ± 0.091 |
+| **L2** | 0.278 ± 0.079 | 0.411 ± 0.052 | 0.368 ± 0.045 |
+| **L3** | 0.556 ± 0.142 | 0.396 ± 0.136 | **0.245 ± 0.050** |
+
+### New (this run): ISO 30107-3 cross-domain ACER @ 224 (threshold fixed on dev at APCER ≤ 5 %)
+
+The eval-metrics upgrade (2026-05-28, `038ae2c`) is exercised end-to-end for the first time here. ACER values land 0.35–0.50 across cells — i.e. **there is essentially no usable operating point at the 5 % APCER target** at this resolution with the existing model architectures.
+
+| | D1 | D2 | D3 | (mix) D3 |
+|---|---|---|---|---|
+| L1 | 0.370 | 0.374 | 0.386 | 0.467 |
+| L2 | 0.367 | 0.408 | 0.480 | 0.494 |
+| L3 | 0.503 | 0.408 | 0.356 | 0.395 |
+
+### Headline finding: A1 alone is **not** an improvement — under-capacity is now the bottleneck
+
+Compared to the 64×64 baseline (2026-05-27 update):
+
+| Cell | 64×64 (mask-only / integrated) | 224×224 (mask-only / integrated) | Δ |
+|---|---|---|---|
+| Mask L3·D3 (best at 64) | **0.089** | 0.291 | **+0.202** (worse) |
+| Integrated L2·D3 (best at 64) | **0.094** | **0.194** | **+0.100** (worse) |
+| Mask L1·D3 (print-comparable) | 0.248 | 0.328 | +0.080 (worse) |
+| L3·D3 in-domain (synth memorisation) | **0.000** | **0.465** | +0.465 (can no longer fit train) |
+
+The cross-domain numbers got **worse**, not better. The **in-domain** L3·D3 number is the smoking-gun explanation: at 64×64 ResNet18 memorised the synthetic training set to EER = 0.000; at 224×224 it can't fit even the training set to better than 0.465. The conv stem (3→8→16 channels for TinyCNN; comparable widths for SmallCNN/ResNet18 in `models_zoo.FACTORIES`) is parameterised for 64×64 inputs and is now under-capacity for 12× the pixel count.
+
+**No artifact-discipline violation** — every cross-domain cell mean is in (0.19, 0.58), well above the 0.001 floor. The image-fraction physics retune (commits `7021fb3`, `3130a36`, `3cd22ed`) held: no 0.000 collapse, no fingerprint regression. The result is genuinely "model can't extract enough signal," not "physics-fingerprint shortcut."
+
+### What this means for the lever queue
+
+A1 was advertised as the cheaper of the A1+A2 pair, and the spec was honest that it "isolates the resolution effect, A2 measures incremental capture-realism win." The finding is sharper than the spec anticipated:
+
+- **A1 alone is a NEGATIVE result** at the existing model scale — the bigger inputs need a bigger model, not just bigger inputs.
+- **A2 (sensor expansion) becomes higher-leverage** than the spec implied: it directly improves what the model is supposed to learn (capture-realistic cues), which a marginally-larger model could then pick up.
+- **B2 (pretrained backbone / model upsize)** — originally last in the queue — now looks like a peer of A2: at 224, swapping in an ImageNet-pretrained backbone gives the model the parameters and the feature-learning prior needed to leverage the resolution.
+- **B1 (synth-pretrain → real-finetune curve)** assumes the synthetic detector is at least partially useful as initialisation. Today's L3·D3 in-domain = 0.465 says it isn't a strong initialiser. B1's value at 224 is questionable until A2 or B2 fixes the capacity gap.
+
+Updated recommendation: do **A2 + B2 together** (sensor expansion to provide learnable cues, model upgrade to actually learn them). Defer pure-A2 or pure-B2 in isolation — both alone would likely produce similarly stuck numbers.
+
+### Raw results
+
+- Mask-only @ 224 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask_224/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask_224/summary.csv)
+- Integrated @ 224 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix_224/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix_224/summary.csv)
+- Configs unchanged from the 64×64 sweep — only the `bonafide.root` flipped to `digiface_224` (commit `04bb4e3`).
