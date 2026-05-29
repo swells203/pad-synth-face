@@ -155,7 +155,13 @@ def _apply_halftone(
 
     Returns float [0,1] (H,W,3).
     """
-    base_cell = max(2.0, round(8.0 * 150.0 / float(print_dpi)))
+    # Image-fraction-based: a halftone cell occupies the same fraction of
+    # image area regardless of resolution (preserves real-world print
+    # geometry across capture resolutions). The constant 0.125 calibrates
+    # so that at image dim 64 and print_dpi 150 the formula reproduces the
+    # pre-bump cell_px=8 exactly. See spec §4 (2026-05-29 resolution bump).
+    image_dim = rgb.shape[0]
+    base_cell = max(2.0, image_dim * 0.125 * (150.0 / float(print_dpi)))
     cmyk = _to_cmyk(rgb)
     out = np.empty_like(cmyk)
     for i, base_angle in enumerate(_HALFTONE_ANGLES_DEG):
