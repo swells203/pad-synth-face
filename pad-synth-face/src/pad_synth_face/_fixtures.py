@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from pad_synth_core import IMAGE_SIZE
+
 
 def build_fixture_bonafide(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
@@ -16,8 +18,8 @@ def build_fixture_bonafide(root: Path) -> Path:
         identity_dir.mkdir(exist_ok=True)
         for sample in range(2):
             base = rng.integers(50, 200, size=3)
-            arr = np.tile(base, (64, 64, 1)).astype(np.uint8)
-            noise = rng.integers(-20, 20, size=(64, 64, 3), dtype=np.int16)
+            arr = np.tile(base, (IMAGE_SIZE, IMAGE_SIZE, 1)).astype(np.uint8)
+            noise = rng.integers(-20, 20, size=(IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.int16)
             arr = np.clip(arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
             Image.fromarray(arr).save(identity_dir / f"{sample}.png")
     return root
@@ -82,24 +84,24 @@ def build_extended_fixture_bonafide(root: Path) -> Path:
     """
     root.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(1)  # different from basic fixture's seed (0)
-    oval = _oval_mask(64, 64)
-    eye = _eye_region_darken(64, 64)
+    oval = _oval_mask(IMAGE_SIZE, IMAGE_SIZE)
+    eye = _eye_region_darken(IMAGE_SIZE, IMAGE_SIZE)
     for identity in range(16):
         identity_dir = root / f"{identity:08d}"
         identity_dir.mkdir(exist_ok=True)
         base = np.array(_SKIN_TONE_PALETTE[identity], dtype=np.float32)
         for sample in range(4):
             # Background base * oval * eye attenuation, then per-sample noise.
-            face = np.tile(base, (64, 64, 1))  # (h, w, 3)
+            face = np.tile(base, (IMAGE_SIZE, IMAGE_SIZE, 1))  # (h, w, 3)
             face = face * oval[:, :, None] * eye[:, :, None]
             # Background outside the oval falls toward neutral grey.
             # Note: oval is already applied to `face` above; using it again as the
             # alpha factor here is intentional — produces edge darkening (oval^2
             # weighting) that increases the domain gap to Set A's flat blobs.
-            background = np.full((64, 64, 3), 90.0, dtype=np.float32)
+            background = np.full((IMAGE_SIZE, IMAGE_SIZE, 3), 90.0, dtype=np.float32)
             blend = oval[:, :, None]
             arr = face * blend + background * (1.0 - blend)
-            noise = rng.integers(-15, 15, size=(64, 64, 3), dtype=np.int16)
+            noise = rng.integers(-15, 15, size=(IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.int16)
             arr = np.clip(arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
             Image.fromarray(arr).save(identity_dir / f"{sample}.png")
     return root

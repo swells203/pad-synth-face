@@ -33,12 +33,13 @@ from PIL import Image
 
 import pad_synth_core
 import pad_synth_face
+from pad_synth_core import IMAGE_SHAPE, IMAGE_SIZE
 from pad_synth_core.manifest import BonafideSource, ManifestWriter, SampleRecord
 from pad_synth_core.provenance import ProvenanceLedger, RealAttackIngested
 from pad_synth_core.qc.per_sample import check_image_basic
 
 _EXTS = {".jpg", ".jpeg", ".png"}
-_TARGET = (64, 64, 3)
+_TARGET = IMAGE_SHAPE
 
 
 def _list_images(d: Path) -> list[Path]:
@@ -47,9 +48,9 @@ def _list_images(d: Path) -> list[Path]:
     )
 
 
-def _load_64(path: Path) -> np.ndarray:
+def _load_target(path: Path) -> np.ndarray:
     with Image.open(path) as im:
-        im = im.convert("RGB").resize((64, 64), Image.LANCZOS)
+        im = im.convert("RGB").resize((IMAGE_SIZE, IMAGE_SIZE), Image.LANCZOS)
         return np.asarray(im, dtype=np.uint8)
 
 
@@ -84,7 +85,7 @@ def ingest_real_attack(
                 sid = f"{prefix}-{i:08d}"
                 if sid in existing:
                     continue
-                arr = _load_64(fp)
+                arr = _load_target(fp)
                 if not check_image_basic(arr, _TARGET).ok:
                     skipped += 1
                     continue

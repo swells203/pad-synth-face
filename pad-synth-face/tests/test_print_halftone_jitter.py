@@ -1,12 +1,13 @@
 import numpy as np
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_face.attacks.print import _apply_halftone
 
 
 def test_jitter_different_rng_states_produce_different_outputs():
     """The load-bearing invariant: two different rngs -> two different halftone
     outputs. Without this, the watermark survives the v2.1 work."""
-    rgb = np.full((64, 64, 3), 0.5, dtype=np.float32)
+    rgb = np.full(IMAGE_SHAPE, 0.5, dtype=np.float32)
     out_a = _apply_halftone(rgb, print_dpi=300, rng=np.random.default_rng(1))
     out_b = _apply_halftone(rgb, print_dpi=300, rng=np.random.default_rng(2))
     assert not np.array_equal(out_a, out_b)
@@ -14,7 +15,7 @@ def test_jitter_different_rng_states_produce_different_outputs():
 
 def test_jitter_same_rng_state_produces_identical_output():
     """Determinism: same rng seed -> byte-identical output (pipeline invariant)."""
-    rgb = np.full((64, 64, 3), 0.5, dtype=np.float32)
+    rgb = np.full(IMAGE_SHAPE, 0.5, dtype=np.float32)
     out_a = _apply_halftone(rgb, print_dpi=300, rng=np.random.default_rng(7))
     out_b = _apply_halftone(rgb, print_dpi=300, rng=np.random.default_rng(7))
     assert np.array_equal(out_a, out_b)
@@ -30,7 +31,7 @@ def test_no_rng_preserves_deterministic_v2_path():
 
 
 def test_jitter_preserves_shape_dtype_and_range():
-    rgb = np.random.default_rng(0).random((64, 64, 3)).astype(np.float32)
+    rgb = np.random.default_rng(0).random(IMAGE_SHAPE).astype(np.float32)
     out = _apply_halftone(rgb, print_dpi=300, rng=np.random.default_rng(11))
     assert out.shape == rgb.shape
     assert out.dtype == np.float32

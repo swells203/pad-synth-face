@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE
+
 
 @pytest.fixture
 def fixture_pad_dataset_root(tmp_path: Path) -> Path:
@@ -15,8 +17,8 @@ def fixture_pad_dataset_root(tmp_path: Path) -> Path:
     (root / "face" / "print").mkdir(parents=True)
     rng = np.random.default_rng(0)
     for i in range(8):
-        b = rng.integers(120, 200, size=(64, 64, 3), dtype=np.uint8)
-        a = rng.integers(20, 100, size=(64, 64, 3), dtype=np.uint8)
+        b = rng.integers(120, 200, size=IMAGE_SHAPE, dtype=np.uint8)
+        a = rng.integers(20, 100, size=IMAGE_SHAPE, dtype=np.uint8)
         Image.fromarray(b).save(root / "face" / "bonafide" / f"{i}.jpg")
         Image.fromarray(a).save(root / "face" / "print" / f"{i}.jpg")
     return root

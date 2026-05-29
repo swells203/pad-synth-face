@@ -30,6 +30,7 @@ from PIL import Image
 
 import pad_synth_core
 import pad_synth_face
+from pad_synth_core import IMAGE_SIZE
 from pad_synth_core.manifest import BonafideSource, ManifestWriter, SampleRecord
 from pad_synth_core.provenance import DFDCBonafideIngested, ProvenanceLedger
 from pad_synth_core.qc.per_sample import check_image_basic
@@ -157,7 +158,7 @@ def extract_dfdc_bonafide(
     out: Path,
     license: str,
     source_url: str,
-    res: int = 64,
+    res: int = IMAGE_SIZE,
     frames_per_video: int = 6,
     crop_margin: float = 1.3,
     max_videos: int | None = None,

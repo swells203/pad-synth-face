@@ -2,6 +2,8 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
+from pad_synth_core import IMAGE_SHAPE
+
 from pathlib import Path
 
 from pad_synth_core.eval.baseline import compute_eer, train_and_eval_tiny_cnn
@@ -71,8 +73,8 @@ def test_train_and_cross_domain_eval_with_separate_eval_root(
     (eval_root / "face" / "print").mkdir(parents=True)
     rng = np.random.default_rng(99)
     for i in range(6):
-        b = rng.integers(100, 220, size=(64, 64, 3), dtype=np.uint8)
-        a = rng.integers(10, 90, size=(64, 64, 3), dtype=np.uint8)
+        b = rng.integers(100, 220, size=IMAGE_SHAPE, dtype=np.uint8)
+        a = rng.integers(10, 90, size=IMAGE_SHAPE, dtype=np.uint8)
         Image.fromarray(b).save(eval_root / "face" / "bonafide" / f"{i}.jpg")
         Image.fromarray(a).save(eval_root / "face" / "print" / f"{i}.jpg")
 

@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE, IMAGE_SIZE
 from pad_synth_face._fixtures import build_fixture_dfdc
 
 
@@ -32,7 +33,7 @@ def test_extract_writes_one_dir_per_real_video(tmp_path):
     summary = extract_dfdc_bonafide(
         src=src, out=out,
         license="test-only", source_url="https://example.org/fixture",
-        res=64, frames_per_video=3,
+        res=IMAGE_SIZE, frames_per_video=3,
         detector=_stub_detector_center,
     )
 
@@ -44,7 +45,7 @@ def test_extract_writes_one_dir_per_real_video(tmp_path):
         pngs = sorted((out / name).glob("*.png"))
         assert len(pngs) == 3, f"{name}: {pngs}"
         arr = np.asarray(Image.open(pngs[0]).convert("RGB"))
-        assert arr.shape == (64, 64, 3)
+        assert arr.shape == IMAGE_SHAPE
     assert summary["n_videos"] == 2
     assert summary["n_frames_written"] == 6
     assert 0.0 < summary["detection_rate"] <= 1.0
@@ -57,7 +58,7 @@ def test_manifest_records_dfdc_attribution(tmp_path):
     out = tmp_path / "out"
     extract_dfdc_bonafide(
         src=src, out=out, license="LIC", source_url="URL",
-        res=64, frames_per_video=2, detector=_stub_detector_center,
+        res=IMAGE_SIZE, frames_per_video=2, detector=_stub_detector_center,
     )
     recs = [json.loads(line) for line in (out / "manifest.jsonl").read_text().splitlines()]
     assert len(recs) == 4  # 2 REAL videos x 2 frames
@@ -76,7 +77,7 @@ def test_provenance_event_recorded(tmp_path):
     out = tmp_path / "out"
     extract_dfdc_bonafide(
         src=src, out=out, license="LIC", source_url="URL",
-        res=64, frames_per_video=2, detector=_stub_detector_center,
+        res=IMAGE_SIZE, frames_per_video=2, detector=_stub_detector_center,
     )
     prov = [json.loads(line) for line in (out / "provenance.jsonl").read_text().splitlines()]
     dfdc = [e for e in prov if e["type"] == "dfdc_bonafide_dataset_ingested"]
@@ -96,7 +97,7 @@ def test_idempotent_skips_existing_identities(tmp_path):
     src = build_fixture_dfdc(tmp_path / "src")
     out = tmp_path / "out"
     common = dict(src=src, out=out, license="L", source_url="U",
-                  res=64, frames_per_video=2, detector=_stub_detector_center)
+                  res=IMAGE_SIZE, frames_per_video=2, detector=_stub_detector_center)
     s1 = extract_dfdc_bonafide(**common)
     def digest():
         h = hashlib.sha256()
@@ -118,7 +119,7 @@ def test_detection_failure_produces_empty_identity_and_zero_rate(tmp_path):
     out = tmp_path / "out"
     summary = extract_dfdc_bonafide(
         src=src, out=out, license="L", source_url="U",
-        res=64, frames_per_video=3, detector=_stub_detector_none,
+        res=IMAGE_SIZE, frames_per_video=3, detector=_stub_detector_none,
     )
     assert summary["n_videos"] == 0
     assert summary["n_frames_written"] == 0
@@ -139,7 +140,7 @@ def test_integration_with_digiface_loader(tmp_path):
     out = tmp_path / "out"
     extract_dfdc_bonafide(
         src=src, out=out, license="L", source_url="U",
-        res=64, frames_per_video=2, detector=_stub_detector_center,
+        res=IMAGE_SIZE, frames_per_video=2, detector=_stub_detector_center,
     )
     loader = DigiFaceLoader(out)
     identities = loader.list_identities()
@@ -147,7 +148,7 @@ def test_integration_with_digiface_loader(tmp_path):
     samples = loader.samples_for_identity("video_a")
     assert len(samples) == 2
     arr = loader.load(samples[0])
-    assert arr.shape == (64, 64, 3)
+    assert arr.shape == IMAGE_SHAPE
 
 
 def test_multi_chunk_discovery(tmp_path):
@@ -177,7 +178,7 @@ def test_multi_chunk_discovery(tmp_path):
     out = tmp_path / "out"
     summary = extract_dfdc_bonafide(
         src=src, out=out, license="L", source_url="U",
-        res=64, frames_per_video=2, detector=_stub_detector_center,
+        res=IMAGE_SIZE, frames_per_video=2, detector=_stub_detector_center,
     )
     assert summary["n_videos"] == 4  # 2 chunks x 2 REALs each
 

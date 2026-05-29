@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_face._fixtures import build_fixture_real_attack
 from pad_synth_face.real_attack import ingest_real_attack
 
@@ -29,7 +30,7 @@ def test_canonical_layout_and_counts(tmp_path):
     assert summary["counts"] == {"bonafide": 6, "print": 6, "replay": 6}
     assert sorted(summary["attack_types"]) == ["print", "replay"]
     arr = np.array(Image.open(bona[0]).convert("RGB"))
-    assert arr.shape == (64, 64, 3)
+    assert arr.shape == IMAGE_SHAPE
 
 
 def test_manifest_labels_and_attack_type(tmp_path):
