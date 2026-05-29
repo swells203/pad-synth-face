@@ -7,7 +7,7 @@ run:
 modality: face
 
 bonafide:
-  root: ./datasets/_real/digiface_118k_64
+  root: ./datasets/_real/digiface_224
   samples_per_bonafide: 32
   identities_file: ./configs/digiface_identities_seta.txt
   splits:
