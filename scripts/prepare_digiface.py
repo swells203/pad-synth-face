@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
-"""Resize DigiFace-1M images to 64x64, preserving <root>/<id>/<sample> layout.
+"""Resize DigiFace-1M images to the canonical IMAGE_SIZE (default 224x224),
+preserving <root>/<id>/<sample> layout.
 
 Idempotent: skips files that already exist at the destination. Uses PIL's
-LANCZOS resampling for quality. Writes a `_meta.json` recording the
-operation summary (counts, target size).
+LANCZOS resampling. Writes `_meta.json` recording the target size,
+identity count, and sample counts.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from PIL import Image
 
-TARGET_SIZE = 64
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "pad-synth-core" / "src"))
+
+from pad_synth_core import IMAGE_SIZE  # noqa: E402
 
 
 def main() -> None:
@@ -23,10 +28,13 @@ def main() -> None:
                     help="Source DigiFace root: <src>/<identity>/<sample>.{png,jpg}")
     ap.add_argument("--dst", required=True, type=Path,
                     help="Destination root for resized images")
+    ap.add_argument("--size", type=int, default=IMAGE_SIZE,
+                    help=f"Target square size (default: IMAGE_SIZE={IMAGE_SIZE})")
     args = ap.parse_args()
 
     src_root: Path = args.src
     dst_root: Path = args.dst
+    target_size: int = args.size
     dst_root.mkdir(parents=True, exist_ok=True)
 
     n_ids = 0
@@ -45,12 +53,12 @@ def main() -> None:
                 n_skipped += 1
                 continue
             with Image.open(sample_path) as im:
-                im = im.convert("RGB").resize((TARGET_SIZE, TARGET_SIZE), Image.LANCZOS)
+                im = im.convert("RGB").resize((target_size, target_size), Image.LANCZOS)
                 im.save(out_path, format="PNG")
             n_samples += 1
 
     meta = {
-        "target_size": TARGET_SIZE,
+        "target_size": target_size,
         "src": str(src_root),
         "identities": n_ids,
         "samples_total": n_samples + n_skipped,

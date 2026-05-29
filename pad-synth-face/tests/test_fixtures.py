@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_face._fixtures import (
     build_extended_fixture_bonafide,
     build_fixture_bonafide,
@@ -63,5 +64,5 @@ def test_extended_fixture_images_are_64x64_rgb(tmp_path: Path):
     root = build_extended_fixture_bonafide(tmp_path / "extended")
     first = next(root.rglob("*.png"))
     arr = np.array(Image.open(first).convert("RGB"))
-    assert arr.shape == (64, 64, 3)
+    assert arr.shape == IMAGE_SHAPE
     assert arr.dtype == np.uint8

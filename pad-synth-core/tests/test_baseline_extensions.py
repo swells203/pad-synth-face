@@ -5,6 +5,7 @@ import pytest
 import torch
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_core.eval.baseline import train_and_cross_domain_eval
 from pad_synth_core.eval.models_zoo import make_small_cnn
 
@@ -15,7 +16,7 @@ def _build_tiny_dataset(root: Path, n_bonafide: int = 4, n_attack: int = 4) -> P
         d = base / label_dir
         d.mkdir(parents=True, exist_ok=True)
         for i in range(n):
-            arr = (np.random.default_rng(i).random((64, 64, 3)) * 255).astype("uint8")
+            arr = (np.random.default_rng(i).random(IMAGE_SHAPE) * 255).astype("uint8")
             Image.fromarray(arr).save(d / f"{i:04d}.jpg")
     return root
 

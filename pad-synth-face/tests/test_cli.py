@@ -6,6 +6,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE
+
 
 def _build_pad_dataset(root: Path, seed: int, n: int = 6) -> Path:
     """Build a minimal PAD-shaped on-disk dataset for eval testing."""
@@ -13,8 +15,8 @@ def _build_pad_dataset(root: Path, seed: int, n: int = 6) -> Path:
     (root / "face" / "print").mkdir(parents=True)
     rng = np.random.default_rng(seed)
     for i in range(n):
-        b = rng.integers(100, 220, size=(64, 64, 3), dtype=np.uint8)
-        a = rng.integers(10, 90, size=(64, 64, 3), dtype=np.uint8)
+        b = rng.integers(100, 220, size=IMAGE_SHAPE, dtype=np.uint8)
+        a = rng.integers(10, 90, size=IMAGE_SHAPE, dtype=np.uint8)
         Image.fromarray(b).save(root / "face" / "bonafide" / f"{i}.jpg")
         Image.fromarray(a).save(root / "face" / "print" / f"{i}.jpg")
     return root

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_face.bonafide import DigiFaceLoader
 
 
@@ -19,7 +20,7 @@ def test_loader_loads_image_as_uint8_rgb(fixture_bonafide_dir: Path):
     assert len(samples) == 2
     arr = loader.load(samples[0])
     assert arr.dtype == np.uint8
-    assert arr.shape == (64, 64, 3)
+    assert arr.shape == IMAGE_SHAPE
 
 
 def test_identity_disjoint_split_is_deterministic(fixture_bonafide_dir: Path):

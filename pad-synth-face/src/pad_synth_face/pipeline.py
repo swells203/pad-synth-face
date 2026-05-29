@@ -26,6 +26,7 @@ from pad_synth_core.provenance import (
     OntologyCitation,
     ProvenanceLedger,
 )
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_core.qc.per_sample import check_image_basic
 from pad_synth_core.rng import derive_sample_seed, sample_rng
 from pad_synth_face.attacks.mask import MaskAttack
@@ -40,7 +41,6 @@ _SENSOR_REGISTRY = {
     "mobile-front-2024": MOBILE_FRONT_2024,
     "webcam-1080p": WEBCAM_1080P,
 }
-_FIXED_IMAGE_SHAPE = (64, 64, 3)
 
 
 def _set_global_determinism(seed: int) -> None:
@@ -186,7 +186,7 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
                 rng = sample_rng(bonafide_seed)
                 arr = loader.load(bsamples[sub % len(bsamples)])
                 sensored, sensor_params = apply_sensor(arr, sensor_preset, rng)
-                qc = check_image_basic(sensored, _FIXED_IMAGE_SHAPE)
+                qc = check_image_basic(sensored, IMAGE_SHAPE)
                 if not qc.ok:
                     bonafide_failed += 1
                     bonafide_counter += 1
@@ -240,7 +240,7 @@ def run_pipeline(config_path: Path) -> dict[str, Any]:
             attacked = module.simulate(bonafide_arr, attack_params, rng)
             sensored, sensor_params = apply_sensor(attacked, sensor_preset, rng)
 
-            qc = check_image_basic(sensored, _FIXED_IMAGE_SHAPE)
+            qc = check_image_basic(sensored, IMAGE_SHAPE)
             if not qc.ok:
                 failed += 1
                 continue

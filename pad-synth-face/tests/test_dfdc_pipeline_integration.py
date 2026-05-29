@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import yaml
 
+from pad_synth_core import IMAGE_SIZE
 from pad_synth_face._fixtures import build_fixture_dfdc
 from pad_synth_face.dfdc import extract_dfdc_bonafide
 from pad_synth_face.pipeline import run_pipeline
@@ -25,7 +26,7 @@ def test_run_pipeline_consumes_dfdc_bonafide(tmp_path):
     bonafide_root = tmp_path / "bona"
     extract_dfdc_bonafide(
         src=src, out=bonafide_root, license="L", source_url="U",
-        res=64, frames_per_video=2, detector=_stub_center,
+        res=IMAGE_SIZE, frames_per_video=2, detector=_stub_center,
     )
 
     cfg = {

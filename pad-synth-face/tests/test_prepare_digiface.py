@@ -23,8 +23,8 @@ def test_prepare_digiface_resizes_to_64_and_preserves_layout(tmp_path):
     dst = tmp_path / "out_64"
 
     r = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "prepare_digiface_64.py"),
-         "--src", str(src), "--dst", str(dst)],
+        [sys.executable, str(REPO / "scripts" / "prepare_digiface.py"),
+         "--src", str(src), "--dst", str(dst), "--size", "64"],
         capture_output=True, text=True, check=False,
     )
     assert r.returncode == 0, r.stderr
@@ -51,8 +51,8 @@ def test_prepare_digiface_is_idempotent(tmp_path):
     dst = tmp_path / "out_64"
 
     r1 = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "prepare_digiface_64.py"),
-         "--src", str(src), "--dst", str(dst)],
+        [sys.executable, str(REPO / "scripts" / "prepare_digiface.py"),
+         "--src", str(src), "--dst", str(dst), "--size", "64"],
         capture_output=True, text=True, check=False,
     )
     assert r1.returncode == 0
@@ -61,8 +61,8 @@ def test_prepare_digiface_is_idempotent(tmp_path):
     original_mtime = sample_path.stat().st_mtime
 
     r2 = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "prepare_digiface_64.py"),
-         "--src", str(src), "--dst", str(dst)],
+        [sys.executable, str(REPO / "scripts" / "prepare_digiface.py"),
+         "--src", str(src), "--dst", str(dst), "--size", "64"],
         capture_output=True, text=True, check=False,
     )
     assert r2.returncode == 0

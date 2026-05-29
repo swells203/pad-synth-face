@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_core.ontology import load_ontology
 from pad_synth_core.rng import sample_rng
 from pad_synth_face.attacks.print import PrintAttack
@@ -14,7 +15,7 @@ def _attack() -> PrintAttack:
 
 
 def test_simulate_returns_correct_shape_and_dtype():
-    bonafide = np.full((64, 64, 3), 128, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 128, dtype=np.uint8)
     attack = _attack()
     rng = sample_rng(1)
     params = attack.sample_params(rng)
@@ -35,7 +36,7 @@ def test_simulate_uses_icc_profile_strength_param():
 def test_simulate_low_dpi_has_more_dot_structure_than_high_dpi():
     """Two attacks differing only in print_dpi yield outputs with different
     high-frequency dot structure (low-DPI -> more coarse transitions)."""
-    bonafide = np.full((64, 64, 3), 200, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 200, dtype=np.uint8)
     attack = _attack()
     # Identical other params; only print_dpi differs.
     base = {
@@ -56,7 +57,7 @@ def test_simulate_low_dpi_has_more_dot_structure_than_high_dpi():
 
 
 def test_simulate_deterministic_under_same_seed():
-    bonafide = np.full((64, 64, 3), 128, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 128, dtype=np.uint8)
     attack = _attack()
 
     rng1 = sample_rng(99)
@@ -72,7 +73,7 @@ def test_simulate_deterministic_under_same_seed():
 
 
 def test_simulate_actually_modifies_the_image():
-    bonafide = np.full((64, 64, 3), 128, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 128, dtype=np.uint8)
     attack = _attack()
     rng = sample_rng(2)
     params = attack.sample_params(rng)

@@ -85,6 +85,12 @@ def _apply_cutout(img: np.ndarray, cutout: str) -> np.ndarray:
 # CMYK rosette angles (degrees) per standard 4-color print convention.
 _HALFTONE_ANGLES_DEG: tuple[float, float, float, float] = (15.0, 75.0, 0.0, 45.0)
 
+# Fraction of image height occupied by one halftone cell at the reference
+# (image_dim=64, print_dpi=150). Chosen so the formula reproduces the
+# pre-A1-resolution-bump cell_px = 8 exactly at the reference point
+# (8 / 64 = 0.125). See docs/superpowers/specs/2026-05-29-pad-resolution-bump-design.md §4.
+_HALFTONE_CELL_FRACTION_AT_REFERENCE = 0.125
+
 
 def _to_cmyk(rgb: np.ndarray) -> np.ndarray:
     """RGB float [0,1] (H,W,3) -> CMYK float [0,1] (H,W,4). No profile math."""
@@ -155,7 +161,16 @@ def _apply_halftone(
 
     Returns float [0,1] (H,W,3).
     """
-    base_cell = max(2.0, round(8.0 * 150.0 / float(print_dpi)))
+    if float(print_dpi) <= 0:
+        raise ValueError(f"print_dpi must be positive, got {print_dpi!r}")
+    # Image-fraction-based: a halftone cell occupies the same fraction of
+    # image area regardless of resolution (preserves real-world print
+    # geometry across capture resolutions). The constant 0.125 calibrates
+    # so that at image dim 64 and print_dpi 150 the formula reproduces the
+    # pre-bump cell_px=8 exactly. See spec §4 (2026-05-29 resolution bump).
+    image_dim = rgb.shape[0]
+    base_cell = max(2.0, image_dim * _HALFTONE_CELL_FRACTION_AT_REFERENCE
+                    * (150.0 / float(print_dpi)))
     cmyk = _to_cmyk(rgb)
     out = np.empty_like(cmyk)
     for i, base_angle in enumerate(_HALFTONE_ANGLES_DEG):

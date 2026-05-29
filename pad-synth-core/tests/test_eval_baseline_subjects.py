@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_core.eval.baseline import (
     TinyPADDataset,
     subject_disjoint_split,
@@ -13,7 +14,7 @@ from pad_synth_core.eval.baseline import (
 
 
 def _img(path: Path, seed: int) -> None:
-    arr = (np.random.default_rng(seed).random((64, 64, 3)) * 255).astype("uint8")
+    arr = (np.random.default_rng(seed).random(IMAGE_SHAPE) * 255).astype("uint8")
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(arr).save(path)
 

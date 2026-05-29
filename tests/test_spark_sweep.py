@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from pad_synth_core import IMAGE_SHAPE
+
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -16,7 +18,7 @@ def _seed_dataset(root: Path, n_bonafide: int, n_attack: int) -> Path:
         d = base / label_dir
         d.mkdir(parents=True, exist_ok=True)
         for i in range(n):
-            arr = (np.random.default_rng(i).random((64, 64, 3)) * 255).astype("uint8")
+            arr = (np.random.default_rng(i).random(IMAGE_SHAPE) * 255).astype("uint8")
             Image.fromarray(arr).save(d / f"{i:04d}.jpg")
     return root
 

@@ -1,5 +1,6 @@
 import numpy as np
 
+from pad_synth_core import IMAGE_SHAPE
 from pad_synth_face.attacks.print import (
     _apply_halftone,
     _inv_cmyk,
@@ -25,7 +26,7 @@ def test_to_cmyk_roundtrip_white_and_black():
 
 def test_halftone_changes_dot_count_with_dpi():
     """Lower DPI -> larger cells -> fewer transitions/dots in the screen."""
-    rgb = np.full((64, 64, 3), 0.5, dtype=np.float32)
+    rgb = np.full(IMAGE_SHAPE, 0.5, dtype=np.float32)
     low = _apply_halftone(rgb, print_dpi=150)
     high = _apply_halftone(rgb, print_dpi=1200)
     # Count horizontal sign-flip transitions in the green channel of each.
@@ -46,7 +47,7 @@ def test_halftone_deterministic():
 
 
 def test_halftone_preserves_shape_and_dtype():
-    rgb = np.random.default_rng(0).random((64, 64, 3)).astype(np.float32)
+    rgb = np.random.default_rng(0).random(IMAGE_SHAPE).astype(np.float32)
     out = _apply_halftone(rgb, print_dpi=300)
     assert out.shape == rgb.shape
     assert out.dtype == np.float32

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
+from pad_synth_core import IMAGE_SHAPE, IMAGE_SIZE
 from pad_synth_core.ontology import load_ontology
 from pad_synth_core.rng import sample_rng
 from pad_synth_face.attacks.mask import MaskAttack
@@ -14,7 +15,7 @@ def _ontology():
 
 
 def test_mask_attack_returns_same_shape_uint8():
-    bonafide = np.full((64, 64, 3), 128, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 128, dtype=np.uint8)
     attack = MaskAttack(_ontology())
     rng = sample_rng(1)
     params = attack.sample_params(rng)
@@ -24,7 +25,7 @@ def test_mask_attack_returns_same_shape_uint8():
 
 
 def test_mask_attack_is_deterministic():
-    bonafide = np.full((64, 64, 3), 128, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 128, dtype=np.uint8)
     attack = MaskAttack(_ontology())
 
     rng1 = sample_rng(123)
@@ -41,7 +42,7 @@ def test_mask_attack_is_deterministic():
 
 def test_mask_jitter_different_seeds_differ():
     """Load-bearing anti-watermark invariant: two rngs -> two outputs."""
-    bonafide = np.full((64, 64, 3), 150, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 150, dtype=np.uint8)
     attack = MaskAttack(_ontology())
 
     rng1 = sample_rng(1)
@@ -56,7 +57,7 @@ def test_mask_output_is_not_quantised():
     """Anti-palette guard (the exact v2 halftone mistake): continuous output
     must have far more than the 16-colour palette that produced the watermark."""
     rng = sample_rng(0)
-    bonafide = rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8)
+    bonafide = rng.integers(0, 256, size=IMAGE_SHAPE, dtype=np.uint8)
     attack = MaskAttack(_ontology())
     srng = sample_rng(5)
     out = attack.simulate(bonafide, attack.sample_params(srng), srng)
@@ -68,7 +69,7 @@ def test_mask_output_is_not_quantised():
 
 def test_mask_materials_are_distinguishable():
     """The three mask_type bundles must produce measurably different images."""
-    bonafide = np.full((64, 64, 3), 140, dtype=np.uint8)
+    bonafide = np.full(IMAGE_SHAPE, 140, dtype=np.uint8)
     attack = MaskAttack(_ontology())
 
     outs = {}
@@ -86,11 +87,11 @@ def test_mask_materials_are_distinguishable():
 
 def test_mask_preserves_shape_and_range_on_random_input():
     rng = sample_rng(9)
-    bonafide = rng.integers(0, 256, size=(64, 64, 3), dtype=np.uint8)
+    bonafide = rng.integers(0, 256, size=IMAGE_SHAPE, dtype=np.uint8)
     attack = MaskAttack(_ontology())
     srng = sample_rng(3)
     out = attack.simulate(bonafide, attack.sample_params(srng), srng)
-    assert out.shape == (64, 64, 3)
+    assert out.shape == IMAGE_SHAPE
     assert out.dtype == np.uint8
     assert out.min() >= 0 and out.max() <= 255
 
@@ -99,8 +100,9 @@ def test_aperture_mismatch_darkens_eye_region():
     """Guard that the aperture stage fires (not silently a no-op)."""
     from pad_synth_face.attacks.mask import _aperture_mismatch
 
-    img = np.ones((64, 64, 3), dtype=np.float32)
+    img = np.ones(IMAGE_SHAPE, dtype=np.float32)
     rng = sample_rng(0)
     out = _aperture_mismatch(img, 0.0, rng)
-    # Left-eye centre (~0.36*64, 0.30*64) must be darker than a corner.
-    assert out[23, 19].mean() < out[2, 2].mean()
+    # Left-eye centre is at (y=0.36*IMAGE_SIZE, x=0.30*IMAGE_SIZE) per
+    # attacks/mask.py:_aperture_mismatch -- numpy indexing is [y, x].
+    assert out[int(0.36 * IMAGE_SIZE), int(0.30 * IMAGE_SIZE)].mean() < out[2, 2].mean()
