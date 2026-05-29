@@ -105,6 +105,41 @@ def build_extended_fixture_bonafide(root: Path) -> Path:
     return root
 
 
+def build_fixture_dfdc(root: Path) -> Path:
+    """Procedural DFDC-shaped source for tests: one chunk with 2 REAL +
+    1 FAKE tiny mp4s (synthesised via ffmpeg lavfi -- no PII) and a
+    matching metadata.json. Requires ffmpeg on PATH; tests should
+    pytest.skip if it isn't.
+    """
+    import json
+    import subprocess
+
+    root.mkdir(parents=True, exist_ok=True)
+    chunk = root / "chunk_00"
+    chunk.mkdir(exist_ok=True)
+    spec = [
+        ("video_a.mp4", "REAL", None),
+        ("video_b.mp4", "REAL", None),
+        ("video_c.mp4", "FAKE", "video_a.mp4"),
+    ]
+    for name, _label, _orig in spec:
+        out_path = chunk / name
+        # 2-second 128x96 test pattern, h264 in mp4 (broadly compatible).
+        subprocess.run(
+            ["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi",
+             "-i", "testsrc2=size=128x96:rate=10:d=2",
+             "-pix_fmt", "yuv420p", "-c:v", "libx264",
+             str(out_path)],
+            check=True,
+        )
+    metadata = {
+        name: ({"label": label, "original": orig} if orig else {"label": label})
+        for name, label, orig in spec
+    }
+    (chunk / "metadata.json").write_text(json.dumps(metadata))
+    return root
+
+
 def build_fixture_real_attack(root: Path) -> Path:
     """Procedural folder-convention real-attack source for tests.
 
