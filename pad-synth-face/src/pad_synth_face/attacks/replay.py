@@ -15,6 +15,7 @@ a single column-stripe model for Phase 1.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import cv2
@@ -28,15 +29,34 @@ def _apply_gamma(img: np.ndarray, gamma: float) -> np.ndarray:
 
 
 def _subpixel_grid(h: int, w: int) -> np.ndarray:
+    # Image-fraction pitch: at any image dim the column-stripe pattern
+    # occupies the same visible angular fraction. At h=64 -> pitch=3
+    # (pre-A1-bump back-compat); at h=224 -> pitch=11. See spec §4
+    # (2026-05-29 resolution bump).
+    pitch = max(1, math.floor(h / 64.0 * 3 + 0.5))  # round-half-up (not banker's)
+    levels = np.array([0.92, 0.96, 0.90], dtype=np.float32)
+    # Distribute pitch columns across 3 sub-pixel color stripes.
+    # Red (0.92) always gets 1 column so it reappears exactly once per tile
+    # period (enables period-detection via peak-search). Green (0.96) gets
+    # pitch//3 columns; Blue (0.90) fills the remainder.  At pitch=3 this
+    # gives [0.92, 0.96, 0.90] -- byte-identical to the pre-bump pattern.
+    n_r = 1
+    n_g = pitch // 3
+    n_b = pitch - n_r - n_g
+    expanded = np.repeat(levels, [n_r, n_g, n_b])  # length == pitch
     pattern = np.tile(
-        np.array([0.92, 0.96, 0.90], dtype=np.float32)[None, :, None],
-        (h, w // 3 + 1, 3),
+        expanded[None, :, None],
+        (h, w // pitch + 1, 3),
     )[:, :w]
     return pattern.astype(np.float32)
 
 
 def _moire(h: int, w: int, refresh_hz: int, rng: np.random.Generator) -> np.ndarray:
-    freq = 0.18 + (refresh_hz - 60) * 0.0015
+    # Image-fraction freq: bands-per-image-width stays constant across
+    # resolutions. At h=64 the multiplier 64/h is 1.0 (pre-A1-bump back-
+    # compat); at h=224 the freq is divided by 3.5. See spec §4
+    # (2026-05-29 resolution bump).
+    freq = (0.18 + (refresh_hz - 60) * 0.0015) * (64.0 / h)
     angle = float(rng.uniform(-0.4, 0.4))
     y = np.arange(h)[:, None]
     x = np.arange(w)[None, :]
