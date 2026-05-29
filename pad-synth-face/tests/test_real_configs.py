@@ -6,17 +6,17 @@ REPO = Path(__file__).resolve().parents[2]
 CFG_DIR = REPO / "configs" / "runs"
 
 EXPECTED = {
-    "real_seta_d1.yaml": (20260522, "mobile-front-2024", "./datasets/_real/digiface_118k_64",
+    "real_seta_d1.yaml": (20260522, "mobile-front-2024", "./datasets/_real/digiface_224",
                           6, "./configs/digiface_identities_seta.txt"),
-    "real_seta_d2.yaml": (20260522, "mobile-front-2024", "./datasets/_real/digiface_118k_64",
+    "real_seta_d2.yaml": (20260522, "mobile-front-2024", "./datasets/_real/digiface_224",
                           32, "./configs/digiface_identities_seta.txt"),
-    "real_seta_d3.yaml": (20260522, "mobile-front-2024", "./datasets/_real/digiface_118k_64",
+    "real_seta_d3.yaml": (20260522, "mobile-front-2024", "./datasets/_real/digiface_224",
                           256, "./configs/digiface_identities_seta.txt"),
-    "real_setb_d1.yaml": (20260523, "webcam-1080p", "./datasets/_real/digiface_118k_64",
+    "real_setb_d1.yaml": (20260523, "webcam-1080p", "./datasets/_real/digiface_224",
                           4, "./configs/digiface_identities_setb.txt"),
-    "real_setb_d2.yaml": (20260523, "webcam-1080p", "./datasets/_real/digiface_118k_64",
+    "real_setb_d2.yaml": (20260523, "webcam-1080p", "./datasets/_real/digiface_224",
                           32, "./configs/digiface_identities_setb.txt"),
-    "real_setb_d3.yaml": (20260523, "webcam-1080p", "./datasets/_real/digiface_118k_64",
+    "real_setb_d3.yaml": (20260523, "webcam-1080p", "./datasets/_real/digiface_224",
                           256, "./configs/digiface_identities_setb.txt"),
 }
 

@@ -1,5 +1,7 @@
 # PAD Spark Scaling Sweep — Results
 
+> **Resolution baseline change (2026-05-29):** all sections in this report up to and including the 2026-05-27 update used the 64×64 baseline. Subsequent A1 sweep results will use 224×224 as the new canonical resolution. Old 64×64 numbers below remain immutable for historical comparison.
+
 **Date:** 2026-05-22
 **Spec:** [`../specs/2026-05-22-pad-spark-scaling-design.md`](../specs/2026-05-22-pad-spark-scaling-design.md)
 **Plan:** [`../plans/2026-05-22-pad-spark-scaling.md`](../plans/2026-05-22-pad-spark-scaling.md)
