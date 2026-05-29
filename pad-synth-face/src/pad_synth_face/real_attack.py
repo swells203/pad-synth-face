@@ -3,7 +3,7 @@
 Reads the folder convention
     <src>/bonafide/**/*.{jpg,jpeg,png}
     <src>/attack/<attack_type>/**/*.{jpg,jpeg,png}
-and writes the canonical 64x64 dataset that pad_synth_core.eval consumes:
+and writes the canonical IMAGE_SIZE×IMAGE_SIZE dataset that pad_synth_core.eval consumes:
     <out>/face/bonafide/real-bonafide-NNNNNNNN.jpg
     <out>/face/<attack_type>/real-<attack_type>-NNNNNNNN.jpg
     <out>/manifest.jsonl

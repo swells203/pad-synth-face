@@ -75,7 +75,7 @@ def build_extended_fixture_bonafide(root: Path) -> Path:
     """Phase 1.5 Set B bonafide fixture.
 
     16 identities x 4 samples each. Each identity has a base skin-tone color
-    drawn from a Fitzpatrick-inspired palette. Each image is a 64x64 RGB image
+    drawn from a Fitzpatrick-inspired palette. Each image is an IMAGE_SIZE×IMAGE_SIZE RGB image
     with an oval face silhouette (Gaussian falloff from center) and darker
     eye-region patches. Per-sample noise gives 4 distinct images per identity.
 

@@ -103,5 +103,6 @@ def test_aperture_mismatch_darkens_eye_region():
     img = np.ones(IMAGE_SHAPE, dtype=np.float32)
     rng = sample_rng(0)
     out = _aperture_mismatch(img, 0.0, rng)
-    # Left-eye centre (~0.36*IMAGE_SIZE, 0.30*IMAGE_SIZE) must be darker than a corner.
-    assert out[int(0.30 * IMAGE_SIZE), int(0.36 * IMAGE_SIZE)].mean() < out[2, 2].mean()
+    # Left-eye centre is at (y=0.36*IMAGE_SIZE, x=0.30*IMAGE_SIZE) per
+    # attacks/mask.py:_aperture_mismatch -- numpy indexing is [y, x].
+    assert out[int(0.36 * IMAGE_SIZE), int(0.30 * IMAGE_SIZE)].mean() < out[2, 2].mean()
