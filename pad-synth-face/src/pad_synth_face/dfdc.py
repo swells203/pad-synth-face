@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -73,9 +74,9 @@ def _video_duration_seconds(video_path: Path) -> float:
             lambda out, _err: float(out.strip()),
         ),
         (
-            ["ffmpeg", "-loglevel", "error", "-i", str(video_path),
+            ["ffmpeg", "-loglevel", "info", "-i", str(video_path),
              "-f", "null", "-"],
-            # ffmpeg -i prints "Duration: HH:MM:SS.ss" to stderr even in error mode
+            # ffmpeg prints Duration: at info loglevel
             lambda _out, err: _parse_ffmpeg_duration(err),
         ),
     ]:
@@ -91,7 +92,6 @@ def _video_duration_seconds(video_path: Path) -> float:
 
 def _parse_ffmpeg_duration(stderr: str) -> float:
     """Extract duration seconds from ffmpeg -i stderr output."""
-    import re
     m = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", stderr)
     if not m:
         raise ValueError("no Duration line in ffmpeg stderr")
@@ -114,7 +114,8 @@ def _extract_frames(video_path: Path, n: int) -> list[np.ndarray]:
                  "-f", "image2pipe", "-vcodec", "png", "-"],
                 capture_output=True, check=True, timeout=15,
             )
-            img = Image.open(io.BytesIO(r.stdout)).convert("RGB")
+            with Image.open(io.BytesIO(r.stdout)) as im:
+                img = im.convert("RGB")
             frames.append(np.asarray(img, dtype=np.uint8))
         except (subprocess.SubprocessError, OSError):
             continue
@@ -125,17 +126,27 @@ def _square_crop_resize(
     frame: np.ndarray, bbox: tuple[int, int, int, int],
     margin: float, res: int,
 ) -> np.ndarray:
-    """Square-crop around bbox centre scaled by `margin`, clip to frame, resize."""
+    """Square-crop around bbox centre scaled by `margin`, shifted inward if
+    needed so the crop stays square even when the bbox centre is near a
+    frame edge. Falls back to a smaller square if the requested side
+    exceeds either frame dimension."""
     fh, fw = frame.shape[:2]
     x, y, w, h = bbox
     cx, cy = x + w / 2.0, y + h / 2.0
-    half = max(w, h) * margin / 2.0
-    x0 = max(0, int(round(cx - half)))
-    y0 = max(0, int(round(cy - half)))
-    x1 = min(fw, int(round(cx + half)))
-    y1 = min(fh, int(round(cy + half)))
-    crop = frame[y0:y1, x0:x1]
-    if crop.size == 0:
+    side = int(round(max(w, h) * margin))
+    side = min(side, fh, fw)  # never larger than the frame
+    if side <= 0:
+        return np.zeros((res, res, 3), dtype=np.uint8)
+    half = side / 2.0
+    # Shift the window to keep it square AND in-bounds.
+    x0 = int(round(cx - half))
+    y0 = int(round(cy - half))
+    x0 = max(0, min(x0, fw - side))
+    y0 = max(0, min(y0, fh - side))
+    crop = frame[y0:y0 + side, x0:x0 + side]
+    if crop.shape[0] != crop.shape[1]:
+        # Defensive: shouldn't happen given the clamps above, but keep behaviour
+        # safe if a future tweak breaks the invariant.
         return np.zeros((res, res, 3), dtype=np.uint8)
     img = Image.fromarray(crop).resize((res, res), Image.LANCZOS)
     return np.asarray(img, dtype=np.uint8)
@@ -182,6 +193,7 @@ def extract_dfdc_bonafide(
     n_videos = 0
     n_frames_written = 0
     n_frames_attempted = 0
+    qc_skipped = 0
 
     with ManifestWriter(out / "manifest.jsonl") as manifest:
         existing_ids = manifest.existing_sample_ids()
@@ -191,7 +203,6 @@ def extract_dfdc_bonafide(
             # identity (covers the common "re-run after success" case).
             if id_dir.exists() and any(id_dir.glob("*.png")):
                 continue
-            id_dir.mkdir(exist_ok=True)
             frames = _extract_frames(video_path, frames_per_video)
             n_frames_attempted += frames_per_video
             written_here = 0
@@ -204,8 +215,10 @@ def extract_dfdc_bonafide(
                     continue
                 arr = _square_crop_resize(frame, bbox, crop_margin, res)
                 if not check_image_basic(arr, (res, res, 3)).ok:
+                    qc_skipped += 1
                     continue
                 out_rel = f"{stem}/{i:03d}.png"
+                id_dir.mkdir(exist_ok=True)  # lazy: only when we have something to write
                 Image.fromarray(arr).save(out / out_rel, format="PNG")
                 sha = hashlib.sha256((out / out_rel).read_bytes()).hexdigest()
                 manifest.append(SampleRecord(
@@ -253,6 +266,7 @@ def extract_dfdc_bonafide(
         "out": str(out),
         "n_videos": n_videos,
         "n_frames_written": n_frames_written,
+        "qc_skipped": qc_skipped,
         "detection_rate": detection_rate,
         "n_real_filenames": len(real_videos),
     }

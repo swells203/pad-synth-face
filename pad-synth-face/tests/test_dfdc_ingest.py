@@ -124,6 +124,12 @@ def test_detection_failure_produces_empty_identity_and_zero_rate(tmp_path):
     assert summary["n_videos"] == 0
     assert summary["n_frames_written"] == 0
     assert summary["detection_rate"] == 0.0
+    # Provenance is not recorded on a zero-write run (matches the idempotency
+    # contract: a no-op run logs nothing).
+    assert not (out / "provenance.jsonl").exists()
+    # And no empty identity directories are left behind (mkdir is lazy).
+    assert not (out / "video_a").exists()
+    assert not (out / "video_b").exists()
 
 
 def test_integration_with_digiface_loader(tmp_path):
@@ -143,3 +149,39 @@ def test_integration_with_digiface_loader(tmp_path):
     assert len(samples) == 2
     arr = loader.load(samples[0])
     assert arr.shape == (64, 64, 3)
+
+
+def test_multi_chunk_discovery(tmp_path):
+    """Two chunk_dirs side by side -> n_chunks=2, both chunks' REAL videos ingested."""
+    import json as _json
+    import subprocess
+
+    from pad_synth_face.dfdc import extract_dfdc_bonafide
+
+    src = tmp_path / "src"
+    for chunk_i in range(2):
+        chunk = src / f"chunk_{chunk_i:02d}"
+        chunk.mkdir(parents=True)
+        for v_i, label in enumerate(("REAL", "REAL")):
+            name = f"chunk{chunk_i}_video{v_i}.mp4"
+            subprocess.run(
+                ["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi",
+                 "-i", "testsrc2=size=128x96:rate=10:d=2",
+                 "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                 str(chunk / name)],
+                check=True,
+            )
+        meta = {f"chunk{chunk_i}_video{v_i}.mp4": {"label": "REAL"}
+                for v_i in range(2)}
+        (chunk / "metadata.json").write_text(_json.dumps(meta))
+
+    out = tmp_path / "out"
+    summary = extract_dfdc_bonafide(
+        src=src, out=out, license="L", source_url="U",
+        res=64, frames_per_video=2, detector=_stub_detector_center,
+    )
+    assert summary["n_videos"] == 4  # 2 chunks x 2 REALs each
+
+    prov = [json.loads(line) for line in (out / "provenance.jsonl").read_text().splitlines()]
+    dfdc = [e for e in prov if e["type"] == "dfdc_bonafide_dataset_ingested"]
+    assert dfdc[0]["n_chunks"] == 2
