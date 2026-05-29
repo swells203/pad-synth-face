@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from pad_synth_face.attacks.print import _apply_halftone
 
@@ -33,11 +34,25 @@ def test_cell_px_scales_with_image_dim():
 
     period_64 = _dominant_period(out_64)
     period_224 = _dominant_period(out_224)
-    # 224 / 64 ≈ 3.5; allow generous tolerance because the halftone screen
-    # rotates per CMYK channel and the dominant peak depends on which
-    # channel the row hits. The scaling DIRECTION is the load-bearing
-    # invariant.
-    assert period_224 > period_64, (
-        f"expected period_224 > period_64 (cell_px scales with image), "
-        f"got {period_224=:.2f} vs {period_64=:.2f}"
+    # Load-bearing invariant: the FRACTIONAL period (period / image_width)
+    # is constant across resolutions — i.e. the dominant period scales
+    # proportionally with image dim. Under the old absolute-pixel formula,
+    # period_224 / period_64 would still be ~3.5 (because FFT bin spacing
+    # is 1/N), but the *fractional* period would shrink at 224 because
+    # cell_px stays at 8. So we pin the ratio to (224/64) = 3.5 -- which
+    # only holds when cell_px itself scales with image dim.
+    ratio = period_224 / period_64
+    expected = 224.0 / 64.0  # 3.5
+    assert abs(ratio - expected) / expected < 0.10, (
+        f"expected period_224 / period_64 ≈ {expected:.2f} (cell_px scales "
+        f"with image), got ratio={ratio:.3f} "
+        f"(period_64={period_64:.2f}, period_224={period_224:.2f})"
     )
+
+
+def test_apply_halftone_rejects_non_positive_dpi():
+    rgb = np.full((64, 64, 3), 0.5, dtype=np.float32)
+    with pytest.raises(ValueError, match="positive"):
+        _apply_halftone(rgb, print_dpi=0)
+    with pytest.raises(ValueError, match="positive"):
+        _apply_halftone(rgb, print_dpi=-150)
