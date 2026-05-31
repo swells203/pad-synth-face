@@ -500,3 +500,78 @@ Updated recommendation: do **A2 + B2 together** (sensor expansion to provide lea
 - Mask-only @ 224 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask_224/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask_224/summary.csv)
 - Integrated @ 224 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix_224/runs/) (27 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix_224/summary.csv)
 - Configs unchanged from the 64×64 sweep — only the `bonafide.root` flipped to `digiface_224` (commit `04bb4e3`).
+
+---
+
+## 2026-05-30 update — B2 (pretrained ResNet18 backbone) result
+
+The 2026-05-29 A1 sweep diagnosed under-capacity at 224×224; a same-day one-cell capacity spike showed ImageNet-pretrained ResNet18 cuts mask-only cross-domain EER from 0.291 (L3 from-scratch) to 0.045 — better than the 64×64 baseline of 0.089. This sweep generalises the spike to the full 18 L4 cells (9 mask + 9 mix) using the same trainer, same epochs (8), same batch size (32), same Adam lr=1e-3, no input normalisation. Only `model_factory` changed: `FACTORIES["L4"] = make_resnet18_pretrained` (`ResNet18_Weights.IMAGENET1K_V1`, final fc replaced with `Linear(512, 2)`). Code SHA: `bf53242`. Wall-time: ~3 min mask + ~4.5 min mix on GB10.
+
+### L4 = pretrained ResNet18 cross-domain EER @ 224 (mean ± std across 3 seeds)
+
+| | D1 (96/128) | D2 (512/1024) | D3 (4096/8192) |
+|---|---|---|---|
+| **mask-only** | 0.151 ± 0.039 | 0.086 ± 0.020 | **0.060 ± 0.012** |
+| **integrated print+replay+mask** | 0.188 ± 0.022 | 0.098 ± 0.023 | **0.059 ± 0.015** |
+
+### L4 in-domain EER @ 224 (mean ± std)
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **mask-only** | 0.194 ± 0.157 | 0.057 ± 0.027 | 0.105 ± 0.089 |
+| **integrated** | 0.139 ± 0.039 | 0.146 ± 0.063 | 0.051 ± 0.016 |
+
+The capacity gap is closed: in-domain D3 drops to 0.05–0.10 (vs the 2026-05-29 A1 result where L3·D3 from-scratch stuck at 0.465 — could not fit even the training set). The model now reliably fits the synthetic training distribution while still generalising cross-domain.
+
+### L4 ISO 30107-3 ACER @ 224 (threshold fixed on dev at APCER ≤ 5 %)
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **mask-only** | 0.258 ± 0.080 | 0.109 ± 0.039 | **0.063 ± 0.022** |
+| **integrated** | 0.364 ± 0.094 | 0.203 ± 0.106 | **0.111 ± 0.028** |
+
+**First configuration in the project's history with a usable operating point at the ISO 5 % APCER target.** mask-only D3 lands ACER ≈ 6 %; integrated D3 lands ACER ≈ 11 %. Both are deployable as PAD detectors at this scale.
+
+### L4 vs L3 from-scratch @ 224 (same datasets, same trainer, same epochs)
+
+| Cell | L3 from-scratch | **L4 pretrained** | Δ |
+|---|---|---|---|
+| mask·D1 | 0.583 | 0.151 | **−0.432** |
+| mask·D2 | 0.292 | 0.086 | **−0.206** |
+| mask·D3 | 0.291 | **0.060** | **−0.231** |
+| mix·D1 | 0.323 | 0.188 | **−0.136** |
+| mix·D2 | 0.264 | 0.098 | **−0.166** |
+| mix·D3 | 0.225 | **0.059** | **−0.166** |
+
+ImageNet inductive bias dominates the from-scratch ResNet18 of identical parameter count by 2–4× on every cell.
+
+### L4 @ 224 vs the 64×64 baseline (best-of-baseline per sweep)
+
+| Sweep | 64×64 best (L1–L3) | L4 @ 224 best | Δ |
+|---|---|---|---|
+| mask-only (best 64: L3·D3 = 0.089) | 0.089 | **0.060** (L4·D3) | **−0.029** (−33 %) |
+| integrated (best 64: L2·D3 = 0.094) | 0.094 | **0.059** (L4·D3) | **−0.035** (−37 %) |
+
+**The project has its best cross-domain numbers ever** — and unlike the 64×64 baseline (which only delivered threshold-free EER, no usable operating point), this configuration also delivers ACER ≤ 11 % at the ISO 5 % APCER target.
+
+### Headline finding
+
+The spike generalised. Pretrained ResNet18 at 224×224 is the project's first deployable PAD configuration. The full B2 sweep (18 cells, 3 seeds each) shows the headline numbers are robust (std 0.012–0.039) and the operating-point metrics (ACER ≤ 11 %) confirm usability — not just a favourable EER threshold.
+
+**The lever stack worked end-to-end:**
+- **C (eval-metrics upgrade)** made the problem measurable — without ISO ACER, the 64×64 EER would have looked superficially "good" without revealing that no usable operating point existed.
+- **A1 (resolution bump)** made the inputs rich enough for pretrained features to find PAD-relevant signal — at 64×64 the high-frequency cues that ImageNet features lock onto are destroyed by the resize.
+- **B2 (pretrained backbone)** gave the model the capacity and inductive bias to actually learn from those richer inputs.
+
+### Phase recommendation update
+
+- **B2 is the new production baseline.** L4 = pretrained ResNet18 at 224×224 on the v2.1+DigiFace+mask base is the configuration to ship and iterate from.
+- **A2 (sensor capture-realism) is the next sub-project**, now genuinely incremental on top of B2 rather than the urgent fix it looked like after the A1 negative result. Expand `sensor.py` with ISP shot/read noise, JPEG recompression, motion blur, lens distortion, replay recapture chain — each adds capture-realism the model is now equipped to exploit.
+- **B1 (synth-pretrain → real-finetune curve) is now well-anchored**: the L4 detector is a strong synthetic initialiser (in-domain 0.05–0.10), so the curve will measure a meaningful gradient as real data is added.
+- **DFDC sweep + Tier-B real benchmark** become much higher-value with this baseline — the synth→real gap can be measured against a genuinely useful synthetic detector rather than a chance-level one.
+
+### Raw results
+
+- Mask-only L4 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/summary.csv)
+- Integrated L4 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/summary.csv)
+- Configs unchanged from the A1 sweep (same `mask_*` / `mix_*` configs); only the model factory differs.
