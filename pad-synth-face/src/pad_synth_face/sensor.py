@@ -17,6 +17,10 @@ class SensorPreset:
     jpeg_qf_range: tuple[int, int]
     wb_k_range: tuple[int, int]
     vignette_strength: float
+    # A2 capture-realism fields (2026-05-31)
+    lens_k1_range: tuple[float, float]
+    motion_blur_px_range: tuple[int, int]
+    jpeg_passes_range: tuple[int, int]
 
 
 MOBILE_FRONT_2024 = SensorPreset(
@@ -25,6 +29,9 @@ MOBILE_FRONT_2024 = SensorPreset(
     jpeg_qf_range=(75, 95),
     wb_k_range=(4200, 6500),
     vignette_strength=0.35,
+    lens_k1_range=(-0.10, 0.10),
+    motion_blur_px_range=(1, 7),
+    jpeg_passes_range=(1, 3),
 )
 
 WEBCAM_1080P = SensorPreset(
@@ -33,6 +40,9 @@ WEBCAM_1080P = SensorPreset(
     jpeg_qf_range=(70, 92),
     wb_k_range=(3200, 6000),
     vignette_strength=0.20,
+    lens_k1_range=(-0.05, 0.05),
+    motion_blur_px_range=(1, 4),
+    jpeg_passes_range=(1, 2),
 )
 
 
