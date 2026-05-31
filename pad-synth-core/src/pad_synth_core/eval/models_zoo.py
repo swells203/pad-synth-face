@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
-from torchvision.models import resnet18
+from torchvision.models import ResNet18_Weights, resnet18
 
 
 def make_tiny_cnn() -> nn.Module:
@@ -53,8 +53,17 @@ def make_resnet18() -> nn.Module:
     return m
 
 
+def make_resnet18_pretrained() -> nn.Module:
+    """ResNet18 with ImageNet-pretrained weights; final fc -> Linear(512, 2).
+    Same head-swap pattern as `make_resnet18`; only the weight init differs."""
+    m = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+    m.fc = nn.Linear(m.fc.in_features, 2)
+    return m
+
+
 FACTORIES = {
     "L1": make_tiny_cnn,
     "L2": make_small_cnn,
     "L3": make_resnet18,
+    "L4": make_resnet18_pretrained,
 }
