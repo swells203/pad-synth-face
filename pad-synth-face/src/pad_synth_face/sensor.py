@@ -6,6 +6,7 @@ import io
 from dataclasses import dataclass
 from typing import Any
 
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -62,6 +63,34 @@ def _white_balance(img: np.ndarray, kelvin: int) -> np.ndarray:
     gains = np.array([1.0 - 0.10 * t, 1.0, 1.0 + 0.10 * t], dtype=np.float32)
     out = img.astype(np.float32) * gains
     return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def _lens_distort(img: np.ndarray, k1: float) -> np.ndarray:
+    """Radial (Brown-Conrady k1-only) distortion via cv2.remap.
+
+    k1=0 is identity. k1>0 is pincushion, k1<0 is barrel. Normalised radius
+    `r` measured from image centre, displaced by r' = r * (1 + k1*r²).
+    """
+    h, w = img.shape[:2]
+    if k1 == 0.0:
+        return img.copy()
+    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
+    # Normalise so r=1 at the image corner (half-diagonal).
+    r_norm = float(np.hypot(cy, cx))
+    yv, xv = np.mgrid[0:h, 0:w].astype(np.float32)
+    dx = (xv - cx) / r_norm
+    dy = (yv - cy) / r_norm
+    r2 = dx * dx + dy * dy
+    factor = 1.0 + k1 * r2
+    map_x = (dx * factor) * r_norm + cx
+    map_y = (dy * factor) * r_norm + cy
+    return cv2.remap(
+        img,
+        map_x.astype(np.float32),
+        map_y.astype(np.float32),
+        interpolation=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REFLECT_101,
+    )
 
 
 def _noise(img: np.ndarray, iso: int, rng: np.random.Generator) -> np.ndarray:
