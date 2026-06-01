@@ -148,3 +148,42 @@ def test_noise_jitters_with_rng():
     out1 = _noise(img, iso=400, rng=sample_rng(5))
     out2 = _noise(img, iso=400, rng=sample_rng(6))
     assert not np.array_equal(out1, out2)
+
+
+def test_jpeg_chain_single_pass_matches_jpeg_roundtrip():
+    from pad_synth_face.sensor import _jpeg_chain, _jpeg_roundtrip
+
+    img = (np.random.default_rng(0).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    chained = _jpeg_chain(img, qf_per_pass=[85])
+    single = _jpeg_roundtrip(img, qf=85)
+    assert np.array_equal(chained, single)
+
+
+def test_jpeg_chain_multiple_passes_degrades_more_than_single():
+    from pad_synth_face.sensor import _jpeg_chain
+
+    img = (np.random.default_rng(1).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    one_pass = _jpeg_chain(img, qf_per_pass=[75])
+    three_pass = _jpeg_chain(img, qf_per_pass=[75, 75, 75])
+    # Each re-encode at the same QF accumulates loss; pixel-wise L2 grows.
+    delta_one = np.abs(img.astype(np.int16) - one_pass.astype(np.int16)).mean()
+    delta_three = np.abs(img.astype(np.int16) - three_pass.astype(np.int16)).mean()
+    assert delta_three > delta_one
+
+
+def test_jpeg_chain_deterministic():
+    from pad_synth_face.sensor import _jpeg_chain
+
+    img = (np.random.default_rng(2).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    out1 = _jpeg_chain(img, qf_per_pass=[90, 80])
+    out2 = _jpeg_chain(img, qf_per_pass=[90, 80])
+    assert np.array_equal(out1, out2)
+
+
+def test_jpeg_chain_preserves_shape_dtype():
+    from pad_synth_face.sensor import _jpeg_chain
+
+    img = (np.random.default_rng(3).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    out = _jpeg_chain(img, qf_per_pass=[88, 82, 78])
+    assert out.shape == img.shape
+    assert out.dtype == np.uint8

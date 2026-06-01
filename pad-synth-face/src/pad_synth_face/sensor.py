@@ -140,6 +140,18 @@ def _jpeg_roundtrip(img: np.ndarray, qf: int) -> np.ndarray:
     return np.array(Image.open(buf).convert("RGB"), dtype=np.uint8)
 
 
+def _jpeg_chain(img: np.ndarray, qf_per_pass: list[int]) -> np.ndarray:
+    """Apply n encode→decode JPEG passes with the given per-pass quality factors.
+
+    len(qf_per_pass) == 1 is the single-roundtrip baseline. Multi-pass
+    simulates the capture → app → server → CDN re-encode chain.
+    """
+    out = img
+    for qf in qf_per_pass:
+        out = _jpeg_roundtrip(out, qf)
+    return out
+
+
 def apply_sensor(
     img: np.ndarray, preset: SensorPreset, rng: np.random.Generator
 ) -> tuple[np.ndarray, dict[str, Any]]:
