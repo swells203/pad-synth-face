@@ -66,3 +66,42 @@ def test_lens_distort_barrel_and_pincushion_differ():
     barrel = _lens_distort(img, k1=-0.10)
     pincushion = _lens_distort(img, k1=0.10)
     assert not np.array_equal(barrel, pincushion)
+
+
+def test_motion_blur_identity_when_length_one():
+    from pad_synth_face.sensor import _motion_blur
+
+    img = (np.random.default_rng(0).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    out = _motion_blur(img, length_px=1, angle_rad=0.0)
+    assert out.shape == img.shape
+    assert out.dtype == np.uint8
+    assert np.array_equal(out, img)
+
+
+def test_motion_blur_smooths_when_length_large():
+    from pad_synth_face.sensor import _motion_blur
+
+    img = (np.random.default_rng(1).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    out = _motion_blur(img, length_px=7, angle_rad=0.0)
+    assert out.shape == img.shape
+    assert out.dtype == np.uint8
+    # Linear smoothing of a high-frequency noise image must reduce variance
+    assert out.var() < img.var() * 0.85
+
+
+def test_motion_blur_direction_matters():
+    from pad_synth_face.sensor import _motion_blur
+
+    img = (np.random.default_rng(2).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    horiz = _motion_blur(img, length_px=7, angle_rad=0.0)
+    vert = _motion_blur(img, length_px=7, angle_rad=np.pi / 2.0)
+    assert not np.array_equal(horiz, vert)
+
+
+def test_motion_blur_deterministic():
+    from pad_synth_face.sensor import _motion_blur
+
+    img = (np.random.default_rng(3).integers(0, 256, size=(64, 64, 3))).astype(np.uint8)
+    out1 = _motion_blur(img, length_px=5, angle_rad=0.6)
+    out2 = _motion_blur(img, length_px=5, angle_rad=0.6)
+    assert np.array_equal(out1, out2)

@@ -93,6 +93,33 @@ def _lens_distort(img: np.ndarray, k1: float) -> np.ndarray:
     )
 
 
+def _motion_blur(img: np.ndarray, length_px: int, angle_rad: float) -> np.ndarray:
+    """Directional line-kernel blur. length_px=1 is identity.
+
+    Draws a 1-px line through the centre of an (L, L) kernel at the given
+    angle, normalises to sum 1, applies via cv2.filter2D.
+    """
+    L = int(length_px)
+    if L <= 1:
+        return img.copy()
+    kernel = np.zeros((L, L), dtype=np.float32)
+    cx = (L - 1) / 2.0
+    cy = (L - 1) / 2.0
+    half = (L - 1) / 2.0
+    dx = np.cos(angle_rad) * half
+    dy = np.sin(angle_rad) * half
+    x0 = int(round(cx - dx))
+    y0 = int(round(cy - dy))
+    x1 = int(round(cx + dx))
+    y1 = int(round(cy + dy))
+    cv2.line(kernel, (x0, y0), (x1, y1), color=1.0, thickness=1)
+    s = kernel.sum()
+    if s <= 0.0:  # degenerate (shouldn't happen for L>=2, defensive)
+        return img.copy()
+    kernel /= s
+    return cv2.filter2D(img, ddepth=-1, kernel=kernel, borderType=cv2.BORDER_REFLECT_101)
+
+
 def _noise(img: np.ndarray, iso: int, rng: np.random.Generator) -> np.ndarray:
     sigma = 0.5 + (iso / 800.0) * 4.0
     noisy = img.astype(np.float32) + rng.normal(0.0, sigma, size=img.shape)
