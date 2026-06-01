@@ -6,6 +6,7 @@ import io
 from dataclasses import dataclass
 from typing import Any
 
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -17,6 +18,10 @@ class SensorPreset:
     jpeg_qf_range: tuple[int, int]
     wb_k_range: tuple[int, int]
     vignette_strength: float
+    # A2 capture-realism fields (2026-05-31)
+    lens_k1_range: tuple[float, float]
+    motion_blur_px_range: tuple[int, int]
+    jpeg_passes_range: tuple[int, int]
 
 
 MOBILE_FRONT_2024 = SensorPreset(
@@ -25,6 +30,9 @@ MOBILE_FRONT_2024 = SensorPreset(
     jpeg_qf_range=(75, 95),
     wb_k_range=(4200, 6500),
     vignette_strength=0.35,
+    lens_k1_range=(-0.10, 0.10),
+    motion_blur_px_range=(1, 7),
+    jpeg_passes_range=(1, 3),
 )
 
 WEBCAM_1080P = SensorPreset(
@@ -33,6 +41,9 @@ WEBCAM_1080P = SensorPreset(
     jpeg_qf_range=(70, 92),
     wb_k_range=(3200, 6000),
     vignette_strength=0.20,
+    lens_k1_range=(-0.05, 0.05),
+    motion_blur_px_range=(1, 4),
+    jpeg_passes_range=(1, 2),
 )
 
 
@@ -54,10 +65,72 @@ def _white_balance(img: np.ndarray, kelvin: int) -> np.ndarray:
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
+def _lens_distort(img: np.ndarray, k1: float) -> np.ndarray:
+    """Radial (Brown-Conrady k1-only) distortion via cv2.remap.
+
+    k1=0 is identity. k1>0 is pincushion, k1<0 is barrel. Normalised radius
+    `r` measured from image centre, displaced by r' = r * (1 + k1*r²).
+    """
+    h, w = img.shape[:2]
+    if k1 == 0.0:
+        return img.copy()
+    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
+    # Normalise so r=1 at the image corner (half-diagonal).
+    r_norm = float(np.hypot(cy, cx))
+    yv, xv = np.mgrid[0:h, 0:w].astype(np.float32)
+    dx = (xv - cx) / r_norm
+    dy = (yv - cy) / r_norm
+    r2 = dx * dx + dy * dy
+    factor = 1.0 + k1 * r2
+    map_x = (dx * factor) * r_norm + cx
+    map_y = (dy * factor) * r_norm + cy
+    return cv2.remap(
+        img,
+        map_x.astype(np.float32),
+        map_y.astype(np.float32),
+        interpolation=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REFLECT_101,
+    )
+
+
+def _motion_blur(img: np.ndarray, length_px: int, angle_rad: float) -> np.ndarray:
+    """Directional line-kernel blur. length_px=1 is identity.
+
+    Draws a 1-px line through the centre of an (L, L) kernel at the given
+    angle, normalises to sum 1, applies via cv2.filter2D.
+    """
+    L = int(length_px)
+    if L <= 1:
+        return img.copy()
+    kernel = np.zeros((L, L), dtype=np.float32)
+    cx = (L - 1) / 2.0
+    cy = (L - 1) / 2.0
+    half = (L - 1) / 2.0
+    dx = np.cos(angle_rad) * half
+    dy = np.sin(angle_rad) * half
+    x0 = int(round(cx - dx))
+    y0 = int(round(cy - dy))
+    x1 = int(round(cx + dx))
+    y1 = int(round(cy + dy))
+    cv2.line(kernel, (x0, y0), (x1, y1), color=1.0, thickness=1)
+    s = kernel.sum()
+    if s <= 0.0:  # degenerate (shouldn't happen for L>=2, defensive)
+        return img.copy()
+    kernel /= s
+    return cv2.filter2D(img, ddepth=-1, kernel=kernel, borderType=cv2.BORDER_REFLECT_101)
+
+
 def _noise(img: np.ndarray, iso: int, rng: np.random.Generator) -> np.ndarray:
-    sigma = 0.5 + (iso / 800.0) * 4.0
-    noisy = img.astype(np.float32) + rng.normal(0.0, sigma, size=img.shape)
-    return np.clip(noisy, 0, 255).astype(np.uint8)
+    """Shot (signal-dependent) + read (fixed) noise.
+
+    Shot: Poisson approximated as Gaussian with sigma=sqrt(signal),
+    scaled by iso/800 * 0.5. Read: fixed-magnitude electronics floor.
+    """
+    signal = img.astype(np.float32)
+    shot_sigma = np.sqrt(np.maximum(signal, 1.0)) * (iso / 800.0) * 0.5
+    shot = rng.normal(0.0, 1.0, size=signal.shape).astype(np.float32) * shot_sigma
+    read = rng.normal(0.0, 1.5, size=signal.shape).astype(np.float32)
+    return np.clip(signal + shot + read, 0, 255).astype(np.uint8)
 
 
 def _jpeg_roundtrip(img: np.ndarray, qf: int) -> np.ndarray:
@@ -67,17 +140,52 @@ def _jpeg_roundtrip(img: np.ndarray, qf: int) -> np.ndarray:
     return np.array(Image.open(buf).convert("RGB"), dtype=np.uint8)
 
 
+def _jpeg_chain(img: np.ndarray, qf_per_pass: list[int]) -> np.ndarray:
+    """Apply n encode→decode JPEG passes with the given per-pass quality factors.
+
+    len(qf_per_pass) == 1 is the single-roundtrip baseline. Multi-pass
+    simulates the capture → app → server → CDN re-encode chain.
+    """
+    out = img
+    for qf in qf_per_pass:
+        out = _jpeg_roundtrip(out, qf)
+    return out
+
+
 def apply_sensor(
     img: np.ndarray, preset: SensorPreset, rng: np.random.Generator
 ) -> tuple[np.ndarray, dict[str, Any]]:
+    # Draw all per-sample parameters up-front from rng so the order of consumption
+    # is stable and the params dict is fully formed before any pixel work.
     iso = int(rng.integers(preset.iso_range[0], preset.iso_range[1] + 1))
     kelvin = int(rng.integers(preset.wb_k_range[0], preset.wb_k_range[1] + 1))
-    qf = int(rng.integers(preset.jpeg_qf_range[0], preset.jpeg_qf_range[1] + 1))
+    lens_k1 = float(rng.uniform(preset.lens_k1_range[0], preset.lens_k1_range[1]))
+    motion_L = int(rng.integers(preset.motion_blur_px_range[0],
+                                preset.motion_blur_px_range[1] + 1))
+    motion_theta = float(rng.uniform(0.0, np.pi))
+    n_passes = int(rng.integers(preset.jpeg_passes_range[0],
+                                preset.jpeg_passes_range[1] + 1))
+    qf_per_pass = [
+        int(rng.integers(preset.jpeg_qf_range[0], preset.jpeg_qf_range[1] + 1))
+        for _ in range(n_passes)
+    ]
 
-    out = _vignette(img, preset.vignette_strength)
-    out = _white_balance(out, kelvin)
+    # Physical pipeline order: optics -> motion -> sensor -> ISP -> compression.
+    out = _lens_distort(img, lens_k1)
+    out = _motion_blur(out, motion_L, motion_theta)
     out = _noise(out, iso, rng)
-    out = _jpeg_roundtrip(out, qf)
+    out = _vignette(out, preset.vignette_strength)
+    out = _white_balance(out, kelvin)
+    out = _jpeg_chain(out, qf_per_pass)
 
-    params = {"iso": iso, "wb_k": kelvin, "jpeg_qf": qf, "preset": preset.name}
+    params = {
+        "iso": iso,
+        "wb_k": kelvin,
+        "lens_k1": lens_k1,
+        "motion_blur_L": motion_L,
+        "motion_blur_theta": motion_theta,
+        "jpeg_passes": n_passes,
+        "jpeg_qf_per_pass": qf_per_pass,
+        "preset": preset.name,
+    }
     return out, params

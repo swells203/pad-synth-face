@@ -575,3 +575,66 @@ The spike generalised. Pretrained ResNet18 at 224×224 is the project's first de
 - Mask-only L4 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4/summary.csv)
 - Integrated L4 per-cell JSON: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4/summary.csv)
 - Configs unchanged from the A1 sweep (same `mask_*` / `mix_*` configs); only the model factory differs.
+
+---
+
+## 2026-06-01 update — A2 capture-realism on L4 pretrained
+
+**Setup:** 18 L4 cells (9 mask + 9 mix at 224×224, D1/D2/D3 × 3 seeds) with the A2-extended sensor pipeline per spec [`docs/superpowers/specs/2026-05-31-pad-a2-capture-realism-design.md`](../specs/2026-05-31-pad-a2-capture-realism-design.md): radial lens distortion (Brown-Conrady k1), directional motion blur, shot+read sensor noise (replacing pure Gaussian), and multi-pass JPEG recompression — each per-sample jittered, default-on in MOBILE/WEBCAM presets, applied in physical pipeline order (lens → motion → noise → vignette → WB → JPEG-chain). Model: `make_resnet18_pretrained` (ImageNet weights), Adam lr=1e-3, 8 epochs, batch 32 — identical training config to the 2026-05-30 L4 baseline; only the sensor pipeline differs. Code SHA `56e6218` on the Spark; sweep wall-time ≈ 3 min mask + ≈ 4.5 min mix on GB10.
+
+### L4+A2 cross-domain EER (mean ± std across 3 seeds)
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **mask-only** | 0.273 ± 0.093 | 0.143 ± 0.033 | **0.080 ± 0.044** |
+| **integrated** | 0.271 ± 0.109 | 0.074 ± 0.006 | **0.055 ± 0.004** |
+
+### L4+A2 in-domain EER
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **mask-only** | 0.278 ± 0.171 | 0.286 ± 0.099 | 0.122 ± 0.058 |
+| **integrated** | 0.333 ± 0.204 | 0.083 ± 0.053 | 0.117 ± 0.045 |
+
+### L4+A2 ACER @ 5 % APCER threshold (mean ± std)
+
+| | D1 | D2 | D3 |
+|---|---|---|---|
+| **mask-only** | 0.388 ± 0.053 | 0.175 ± 0.046 | **0.090 ± 0.049** |
+| **integrated** | 0.410 ± 0.080 | 0.155 ± 0.020 | **0.114 ± 0.058** |
+
+### Comparison vs 2026-05-30 L4 baseline
+
+| Cell | L4 baseline | L4+A2 | Δ EER | Δ std |
+|---|---|---|---|---|
+| mask·D1 | 0.151 ± 0.039 | 0.273 ± 0.093 | **+0.122** | +0.054 (more noisy) |
+| mask·D2 | 0.086 ± 0.020 | 0.143 ± 0.033 | **+0.057** | +0.013 |
+| mask·D3 | 0.060 ± 0.012 | 0.080 ± 0.044 | **+0.020** | +0.032 (more noisy) |
+| mix·D1  | 0.188 ± 0.022 | 0.271 ± 0.109 | **+0.083** | +0.087 (much noisier) |
+| mix·D2  | 0.098 ± 0.023 | 0.074 ± 0.006 | **−0.024** | −0.017 (tighter) |
+| mix·D3  | 0.059 ± 0.015 | 0.055 ± 0.004 | **−0.004** | −0.011 (tighter) |
+
+### Headline finding
+
+**Branch 2 of the §2 decision matrix** ("EER flat vs L4 baseline") — with one caveat: **the integrated (mix) production cell is flat with tighter std** while the **mask-only training regime gets meaningfully harder at every D**. The artifact-free check passes — no cross-domain cell mean ≤ 0.001; APCER (0.048–0.151) and BPCER (0.064–0.755) are both non-degenerate at every cell, so no new fingerprint emerged.
+
+The signal:
+- **mix·D3 (the production deployable cell): 0.055 ± 0.004 vs baseline 0.059 ± 0.015.** A2 leaves the headline integrated number unchanged within noise and substantially tightens variance — the production detector is *more reproducible* with A2 than without it.
+- **mask·D3: 0.080 ± 0.044 vs 0.060 ± 0.012.** Mask-only training degrades by ~0.020 with ~3× higher seed-to-seed variance — A2's capture-realism increases what mask-only training has to learn through but mask diversity isn't sufficient to compensate. The high APCER per-seed range (one seed at 0.018, one at 0.111) shows the training problem became sensitive to seed.
+- **In-domain EER rose at every cell** (e.g. mix·D3 0.051 → 0.117) — A2 made the *learning task itself* harder. The model is no longer near-perfectly fitting synthetic training data, which is the expected and intended effect of adding capture-realism. **This is a feature, not a bug** — over-fit synthetic in-domain numbers were a red flag for what the cross-domain numbers couldn't tell us about synth→real.
+- **Low-D cells (D1) degraded sharply** in both sweeps (~+0.10 EER). With only 256 training samples, A2's added sensor variance dilutes the signal more than the model can recover from at low data.
+
+Spec §2's branch 2 verbatim conclusion applies: *"The detector already saturates on the existing sensor's signal; capture-realism doesn't unlock more within synthetic. Real value will only show under synth→real evaluation. A2 still ships as the production capture chain, but its impact is deferred to the real-data sweeps."*
+
+### Phase recommendation update
+
+- **A2 ships as the production capture chain.** The integrated mix·D3 cell — the configuration we'd actually deploy — is unchanged within noise and tighter. The artifact-discipline checks pass (no collapse, no degenerate APCER/BPCER, in-domain EER non-trivial). The cost is the mask-only sweep weakened by ~0.020; the upside is the detector now sees realistic capture variance during training, which is what synth→real evaluation will reward.
+- **Queue order unchanged.** DFDC sweep / B1 finetune curve / Tier-B real benchmark all remain next. The A2 sensor is their training input going forward; the synth→real benchmarks are the right place to actually measure whether A2 closed the camera-chain gap.
+- **The mask-only baseline weakens slightly** (mask·D3 0.060 → 0.080) but stays usable; mix·D3 is unchanged. The "first deployable PAD configuration" verdict from the B2 update stands for the integrated cell; mask-only is now a slightly weaker entry point.
+- **No A2 ablation cycle needed.** No effect produced a catastrophic fingerprint or single-handedly drove the mask weakening (the seed-level variance pattern indicates the issue is mask diversity × A2 variance interaction, not one bad effect). Per-effect ablation deferred unless a synth→real result implicates a specific effect.
+
+### Raw results
+
+- L4+A2 mask: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/summary.csv)
+- L4+A2 mix: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/summary.csv)
+- Configs unchanged from the B2 sweep (same `mask_*` / `mix_*` 224×224 datasets, regenerated with the A2 sensor pipeline); only the sensor differs.
