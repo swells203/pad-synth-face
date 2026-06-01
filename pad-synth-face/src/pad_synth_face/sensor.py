@@ -155,14 +155,37 @@ def _jpeg_chain(img: np.ndarray, qf_per_pass: list[int]) -> np.ndarray:
 def apply_sensor(
     img: np.ndarray, preset: SensorPreset, rng: np.random.Generator
 ) -> tuple[np.ndarray, dict[str, Any]]:
+    # Draw all per-sample parameters up-front from rng so the order of consumption
+    # is stable and the params dict is fully formed before any pixel work.
     iso = int(rng.integers(preset.iso_range[0], preset.iso_range[1] + 1))
     kelvin = int(rng.integers(preset.wb_k_range[0], preset.wb_k_range[1] + 1))
-    qf = int(rng.integers(preset.jpeg_qf_range[0], preset.jpeg_qf_range[1] + 1))
+    lens_k1 = float(rng.uniform(preset.lens_k1_range[0], preset.lens_k1_range[1]))
+    motion_L = int(rng.integers(preset.motion_blur_px_range[0],
+                                preset.motion_blur_px_range[1] + 1))
+    motion_theta = float(rng.uniform(0.0, np.pi))
+    n_passes = int(rng.integers(preset.jpeg_passes_range[0],
+                                preset.jpeg_passes_range[1] + 1))
+    qf_per_pass = [
+        int(rng.integers(preset.jpeg_qf_range[0], preset.jpeg_qf_range[1] + 1))
+        for _ in range(n_passes)
+    ]
 
-    out = _vignette(img, preset.vignette_strength)
-    out = _white_balance(out, kelvin)
+    # Physical pipeline order: optics -> motion -> sensor -> ISP -> compression.
+    out = _lens_distort(img, lens_k1)
+    out = _motion_blur(out, motion_L, motion_theta)
     out = _noise(out, iso, rng)
-    out = _jpeg_roundtrip(out, qf)
+    out = _vignette(out, preset.vignette_strength)
+    out = _white_balance(out, kelvin)
+    out = _jpeg_chain(out, qf_per_pass)
 
-    params = {"iso": iso, "wb_k": kelvin, "jpeg_qf": qf, "preset": preset.name}
+    params = {
+        "iso": iso,
+        "wb_k": kelvin,
+        "lens_k1": lens_k1,
+        "motion_blur_L": motion_L,
+        "motion_blur_theta": motion_theta,
+        "jpeg_passes": n_passes,
+        "jpeg_qf_per_pass": qf_per_pass,
+        "preset": preset.name,
+    }
     return out, params

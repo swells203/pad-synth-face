@@ -3,7 +3,7 @@
 import numpy as np
 
 from pad_synth_core.rng import sample_rng
-from pad_synth_face.sensor import MOBILE_FRONT_2024, WEBCAM_1080P
+from pad_synth_face.sensor import MOBILE_FRONT_2024, WEBCAM_1080P, apply_sensor
 
 
 def test_mobile_preset_has_a2_fields():
@@ -187,3 +187,50 @@ def test_jpeg_chain_preserves_shape_dtype():
     out = _jpeg_chain(img, qf_per_pass=[88, 82, 78])
     assert out.shape == img.shape
     assert out.dtype == np.uint8
+
+
+def test_apply_sensor_records_new_params_keys():
+    img = (np.random.default_rng(0).integers(0, 256, size=(128, 128, 3))).astype(np.uint8)
+    out, params = apply_sensor(img, MOBILE_FRONT_2024, sample_rng(0))
+    for key in ("lens_k1", "motion_blur_L", "motion_blur_theta",
+                "jpeg_passes", "jpeg_qf_per_pass"):
+        assert key in params, f"missing param key: {key}"
+    # Existing keys still present
+    for key in ("iso", "wb_k", "preset"):
+        assert key in params
+    # Types
+    assert isinstance(params["lens_k1"], float)
+    assert isinstance(params["motion_blur_L"], int)
+    assert isinstance(params["motion_blur_theta"], float)
+    assert isinstance(params["jpeg_passes"], int)
+    assert isinstance(params["jpeg_qf_per_pass"], list)
+    assert len(params["jpeg_qf_per_pass"]) == params["jpeg_passes"]
+
+
+def test_apply_sensor_params_are_within_preset_ranges():
+    img = (np.random.default_rng(0).integers(0, 256, size=(128, 128, 3))).astype(np.uint8)
+    for seed in range(10):
+        _, params = apply_sensor(img, MOBILE_FRONT_2024, sample_rng(seed))
+        p = MOBILE_FRONT_2024
+        assert p.lens_k1_range[0] <= params["lens_k1"] <= p.lens_k1_range[1]
+        assert p.motion_blur_px_range[0] <= params["motion_blur_L"] <= p.motion_blur_px_range[1]
+        assert p.jpeg_passes_range[0] <= params["jpeg_passes"] <= p.jpeg_passes_range[1]
+        assert 0.0 <= params["motion_blur_theta"] < np.pi
+        for qf in params["jpeg_qf_per_pass"]:
+            assert p.jpeg_qf_range[0] <= qf <= p.jpeg_qf_range[1]
+
+
+def test_apply_sensor_anti_watermark_byte_level_jitter():
+    """Two different seeds on the same input must produce byte-different outputs."""
+    img = (np.random.default_rng(0).integers(0, 256, size=(128, 128, 3))).astype(np.uint8)
+    out1, _ = apply_sensor(img, MOBILE_FRONT_2024, sample_rng(0))
+    out2, _ = apply_sensor(img, MOBILE_FRONT_2024, sample_rng(1))
+    assert not np.array_equal(out1, out2)
+
+
+def test_apply_sensor_still_deterministic_with_same_seed():
+    img = (np.random.default_rng(0).integers(0, 256, size=(128, 128, 3))).astype(np.uint8)
+    out1, p1 = apply_sensor(img, MOBILE_FRONT_2024, sample_rng(42))
+    out2, p2 = apply_sensor(img, MOBILE_FRONT_2024, sample_rng(42))
+    assert np.array_equal(out1, out2)
+    assert p1 == p2
