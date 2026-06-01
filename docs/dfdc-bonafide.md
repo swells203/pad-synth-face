@@ -28,18 +28,26 @@ Tests use a stub detector and don't require this; production ingest does.
 ```bash
 .venv/bin/python scripts/prepare_dfdc.py \
   --src /path/to/dfdc/chunks \
-  --out datasets/_real/dfdc_64 \
+  --out datasets/_real/dfdc_224 \
   --license "DFDC research licence (Meta AI)" \
   --source-url "<the URL you downloaded from>" \
-  --res 64 \
+  --res 224 \
   --frames-per-video 6
 ```
 
-Writes `datasets/_real/dfdc_64/<video_stem>/NNN.png` (one directory per
+Writes `datasets/_real/dfdc_224/<video_stem>/NNN.png` (one directory per
 REAL video, frames inside), plus `manifest.jsonl` and `provenance.jsonl`
 recording the licence. Optional flags: `--max-videos N` for a quick smoke,
-`--crop-margin 1.3` to widen the face crop. The default `--res 64` is a
-drop-in replacement for DigiFace; bump it later when A1+A2 ships.
+`--crop-margin 1.3` to widen the face crop.
+
+**Resolution note (2026-06-01):** A1 (224 resolution) and A2 (capture-realism
+sensor) have both shipped, and the production PAD config (B2 pretrained
+ResNet18) runs at 224. The committed `dfdc_set*_d*` sweep configs (§5) point
+at `datasets/_real/dfdc_224`, so ingest at `--res 224` — this gives an
+apples-to-apples comparison against the DigiFace `real_set*` baselines, which
+also use `datasets/_real/digiface_224`. (The earlier `--res 64` drop-in is now
+obsolete; ingest at 64 only if you specifically want to reproduce the pre-A1
+baseline.)
 
 **Real frames are never committed.** `datasets/` is gitignored; keep
 ingested DFDC roots under `datasets/_real/dfdc_<res>/`. Only the script,
@@ -47,65 +55,71 @@ fixture, tests, doc, and provenance/manifest schemas are committed.
 
 ## 4. Pin Set A / Set B identities
 
-After the first ingest, pick disjoint identity lists from the ingested
-videos and commit them:
+After the first ingest, pin disjoint identity lists from the ingested
+videos with the committed helper, then commit the two lists:
 
 ```bash
-.venv/bin/python - <<'PY'
-import pathlib, random
-ids = sorted(p.name for p in pathlib.Path("datasets/_real/dfdc_64").iterdir() if p.is_dir())
-random.Random(20260528).shuffle(ids)
-seta, setb = ids[:8], ids[8:24]
-pathlib.Path("configs/dfdc_identities_seta.txt").write_text("\n".join(seta) + "\n")
-pathlib.Path("configs/dfdc_identities_setb.txt").write_text("\n".join(setb) + "\n")
-print("pinned:", len(seta), "Set A,", len(setb), "Set B")
-PY
+.venv/bin/python scripts/pin_dfdc_identities.py   # reads datasets/_real/dfdc_224
 git add configs/dfdc_identities_set*.txt
 git commit -m "feat(pad-dfdc): pin DFDC Set A/B identities"
 ```
 
-## 5. Create `dfdc_set*_d*` sweep configs (paste once after ingest)
+The helper writes `configs/dfdc_identities_seta.txt` (8 identities) and
+`configs/dfdc_identities_setb.txt` (16 identities) via a deterministic seeded
+shuffle (idempotent for a given ingested set; Set A and Set B are
+identity-disjoint). Override `--root`, `--seta-count`, `--setb-count`, or
+`--seed` if needed. The script errors out cleanly if fewer than 24 identities
+were ingested.
 
-For each `(set, d)` ∈ {(a, 1), (a, 2), (a, 3), (b, 1), (b, 2), (b, 3)},
-write `configs/runs/dfdc_<set>_d<n>.yaml` as a clone of
-`real_<set>_d<n>.yaml` with two changes — point `bonafide.root` at the
-DFDC dir and `bonafide.identities_file` at the DFDC list, e.g.
-`configs/runs/dfdc_seta_d3.yaml`:
+## 5. `dfdc_set*_d*` sweep configs (already committed)
 
-```yaml
-run:
-  name: dfdc_seta_d3
-  output: ./datasets/dfdc_seta_d3
-  seed: 20260522
-  deterministic: true
+The six sweep configs already exist in `configs/runs/`:
 
-modality: face
-
-bonafide:
-  root: ./datasets/_real/dfdc_64
-  samples_per_bonafide: 256
-  identities_file: ./configs/dfdc_identities_seta.txt
-  splits: {train: 0.0, dev: 0.0, test: 1.0}
-
-attacks:
-  mask:
-    weight: 1.0
-    ontology: ./ontology/face/mask.yaml
-
-sensor_preset: mobile-front-2024
+```
+dfdc_seta_d1.yaml  dfdc_seta_d2.yaml  dfdc_seta_d3.yaml
+dfdc_setb_d1.yaml  dfdc_setb_d2.yaml  dfdc_setb_d3.yaml
 ```
 
-(Mirror the corresponding `real_set*` files for non-D3 / Set B; preserve
-the seeds and `samples_per_bonafide` numbers.)
+Each is an exact mirror of its `real_<set>_d<n>.yaml` counterpart with only
+the bonafide source swapped — `bonafide.root → ./datasets/_real/dfdc_224` and
+`bonafide.identities_file → ./configs/dfdc_identities_set<a|b>.txt`. Everything
+else is preserved: seeds (Set A 20260522, Set B 20260523), `samples_per_bonafide`
+(Set A d1/d2/d3 = 6/32/256; Set B = 4/32/256), the print+replay attack mix, and
+the per-set sensor preset (Set A mobile-front-2024, Set B webcam-1080p). This
+makes the DFDC sweep an apples-to-apples swap of the DigiFace baseline — the
+only variable that changes is the bonafide distribution.
+
+No editing needed. They reference `configs/dfdc_identities_set*.txt`, which §4
+produces; until those exist (i.e. until DFDC is ingested) the configs simply
+can't run, which is the intended gate.
 
 ## 6. Run the sweep
 
-Generate the synthetic datasets locally, rsync to the Spark, sweep on the
-GB10 — same procedure as `docs/real-attack-capture.md` §4, swapping
-`mix_seta_d*` for `dfdc_seta_d*`. The headline question is whether real
-DFDC bonafide + v2.1 synthetic attacks beats the DigiFace-bonafide baseline
-(mask-only L3·D3 ≈ 0.089, integrated L2·D3 ≈ 0.094) at 64×64. Append the
-result table to `docs/superpowers/reports/2026-05-22-pad-spark-sweep-results.md`.
+Once §3–§4 are done (data ingested at 224, identities pinned), the sweep is a
+one-command-per-step flow — identical to the 2026-05-31 A2 L4 sweep, just
+swapping the dataset prefix to `dfdc_`:
 
-If yes, the next cycle is the A1+A2 resolution bump which compounds with
-this.
+```bash
+# 1. Generate the 6 synthetic datasets locally (uses the A2 sensor pipeline)
+for cfg in configs/runs/dfdc_set{a,b}_d{1,2,3}.yaml; do
+  ds=$(basename "$cfg" .yaml); rm -rf "datasets/$ds"
+  .venv/bin/python -m pad_synth_face.cli run --config "$cfg"
+done
+
+# 2. rsync code + the 6 dfdc_* datasets to the Spark, then run spark_sweep.py
+#    over the L4 cells (mirror Task 9 of the A2 plan, dfdc_ prefixes).
+#    Output -> docs/.../runs_dfdc_224_L4/ ; pull back and aggregate.
+```
+
+The headline question: does **real DFDC bonafide + A2 synthetic attacks** at
+224 beat the **DigiFace-bonafide L4 production baseline** (the `real_set*` /
+`mix_set*` numbers — mix·D3 ≈ 0.055–0.059 cross-domain EER on pretrained
+ResNet18)? Because the configs differ from `mix_set*` only in the bonafide
+source, any EER delta is attributable to the bonafide distribution, not the
+attack physics or capture chain. Append the result table to
+`docs/superpowers/reports/2026-05-22-pad-spark-sweep-results.md`.
+
+This is the first sub-project that swaps in **real** bonafide faces, so it is
+also the first real test of whether the A2 capture chain narrows the synth→real
+gap (A2's in-synth sweep was flat by design — its payoff is expected to show
+here).
