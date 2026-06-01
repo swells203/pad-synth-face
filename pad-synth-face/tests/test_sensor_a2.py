@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from pad_synth_core.rng import sample_rng
 from pad_synth_face.sensor import MOBILE_FRONT_2024, WEBCAM_1080P
 
 
@@ -105,3 +106,45 @@ def test_motion_blur_deterministic():
     out1 = _motion_blur(img, length_px=5, angle_rad=0.6)
     out2 = _motion_blur(img, length_px=5, angle_rad=0.6)
     assert np.array_equal(out1, out2)
+
+
+def test_noise_scales_with_signal_level():
+    """Shot noise must be larger on bright pixels than dark pixels."""
+    from pad_synth_face.sensor import _noise
+
+    dark = np.full((128, 128, 3), 10, dtype=np.uint8)
+    bright = np.full((128, 128, 3), 200, dtype=np.uint8)
+    rng_d = sample_rng(0)
+    rng_b = sample_rng(0)  # identical rng so only the signal differs
+    noisy_dark = _noise(dark, iso=800, rng=rng_d)
+    noisy_bright = _noise(bright, iso=800, rng=rng_b)
+    # bright signal -> larger shot sigma -> wider noise std
+    assert noisy_bright.astype(np.float32).std() > noisy_dark.astype(np.float32).std()
+
+
+def test_noise_scales_with_iso():
+    """Doubling ISO must measurably increase noise on a fixed signal."""
+    from pad_synth_face.sensor import _noise
+
+    img = np.full((128, 128, 3), 128, dtype=np.uint8)
+    low = _noise(img, iso=100, rng=sample_rng(0))
+    high = _noise(img, iso=1600, rng=sample_rng(0))
+    assert high.astype(np.float32).std() > low.astype(np.float32).std()
+
+
+def test_noise_deterministic_given_rng():
+    from pad_synth_face.sensor import _noise
+
+    img = np.full((128, 128, 3), 128, dtype=np.uint8)
+    out1 = _noise(img, iso=400, rng=sample_rng(5))
+    out2 = _noise(img, iso=400, rng=sample_rng(5))
+    assert np.array_equal(out1, out2)
+
+
+def test_noise_jitters_with_rng():
+    from pad_synth_face.sensor import _noise
+
+    img = np.full((128, 128, 3), 128, dtype=np.uint8)
+    out1 = _noise(img, iso=400, rng=sample_rng(5))
+    out2 = _noise(img, iso=400, rng=sample_rng(6))
+    assert not np.array_equal(out1, out2)

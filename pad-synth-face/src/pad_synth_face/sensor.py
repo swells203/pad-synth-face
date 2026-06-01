@@ -121,9 +121,16 @@ def _motion_blur(img: np.ndarray, length_px: int, angle_rad: float) -> np.ndarra
 
 
 def _noise(img: np.ndarray, iso: int, rng: np.random.Generator) -> np.ndarray:
-    sigma = 0.5 + (iso / 800.0) * 4.0
-    noisy = img.astype(np.float32) + rng.normal(0.0, sigma, size=img.shape)
-    return np.clip(noisy, 0, 255).astype(np.uint8)
+    """Shot (signal-dependent) + read (fixed) noise.
+
+    Shot: Poisson approximated as Gaussian with sigma=sqrt(signal),
+    scaled by iso/800 * 0.5. Read: fixed-magnitude electronics floor.
+    """
+    signal = img.astype(np.float32)
+    shot_sigma = np.sqrt(np.maximum(signal, 1.0)) * (iso / 800.0) * 0.5
+    shot = rng.normal(0.0, 1.0, size=signal.shape).astype(np.float32) * shot_sigma
+    read = rng.normal(0.0, 1.5, size=signal.shape).astype(np.float32)
+    return np.clip(signal + shot + read, 0, 255).astype(np.uint8)
 
 
 def _jpeg_roundtrip(img: np.ndarray, qf: int) -> np.ndarray:
