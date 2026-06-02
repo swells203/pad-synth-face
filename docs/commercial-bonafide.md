@@ -71,16 +71,40 @@ the synthetic datasets locally, rsync to the Spark, and run the L4 sweep —
 identical to the DFDC/A2 procedure, `commercial_` prefixes:
 
 ```bash
+# Generate the 6 synthetic datasets locally (uses the A2 sensor pipeline)
 for cfg in configs/runs/commercial_set{a,b}_d{1,2,3}.yaml; do
   ds=$(basename "$cfg" .yaml); rm -rf "datasets/$ds"
   .venv/bin/python -m pad_synth_face.cli run --config "$cfg"
 done
-# rsync code + the 6 commercial_* datasets to the Spark, then run
-# spark_sweep.py over the L4 cells -> runs_commercial_224_L4/ ; pull back.
+
+# rsync code + the 6 commercial_* datasets to the Spark, then launch the sweep.
+# NOTE: scripts/spark_sweep.py requires a --set-*-d4 path for every set (D4 is
+# a required arg) and defaults to capacities L1-L3 — so you MUST reuse the d3
+# datasets as the d4 placeholder AND request the L4 cells explicitly via --cells
+# (this mirrors the DFDC/A2 sweep invocation exactly):
+ssh swells@spark-50d2.local 'bash -lc "
+cd ~/ml/projects/pad-spark
+CELLS=\$(python3 -c \"print(\\\",\\\".join(f\\\"L4:{D}:{s}\\\" for D in (\\\"D1\\\",\\\"D2\\\",\\\"D3\\\") for s in (0,1,2)))\")
+nohup .venv/bin/python scripts/spark_sweep.py \
+  --set-a-d1 datasets/commercial_seta_d1 --set-b-d1 datasets/commercial_setb_d1 \
+  --set-a-d2 datasets/commercial_seta_d2 --set-b-d2 datasets/commercial_setb_d2 \
+  --set-a-d3 datasets/commercial_seta_d3 --set-b-d3 datasets/commercial_setb_d3 \
+  --set-a-d4 datasets/commercial_seta_d3 --set-b-d4 datasets/commercial_setb_d3 \
+  --output-dir docs/superpowers/reports/2026-05-22-pad-spark-sweep-results/runs_commercial_224_L4 \
+  --cells \"\$CELLS\" --device cuda \
+  > /tmp/sweep_commercial.log 2>&1 &
+echo \$!
+"'
+# Poll /tmp/sweep_commercial.log; then rsync runs_commercial_224_L4/ back locally.
 ```
 
+(The `--set-*-d4` args reuse the d3 datasets purely to satisfy the required
+flag — the `--cells` list only requests D1/D2/D3, so the d4 placeholders are
+never evaluated. This is the same trick the DFDC/A2 sweeps use.)
+
 **Matched-scale caveat:** the verdict compares against the DigiFace
-`runs_mix_224_L4_A2` baseline, which used `samples_per_bonafide` 6/32/256. If
+`runs_mix_224_L4_A2` baseline, whose `samples_per_bonafide` is 6/32/256 for
+Set A and 4/32/256 for Set B (the commercial configs mirror these exactly). If
 your sample is too small for D3 (256/bonafide), reduce `samples_per_bonafide`
 *symmetrically* in both the commercial configs and a re-run DigiFace sweep, and
 point `--baseline-dir` at that matched DigiFace run. The verdict script prints a
