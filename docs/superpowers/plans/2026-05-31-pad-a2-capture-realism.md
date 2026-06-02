@@ -864,7 +864,7 @@ Expected: an existing script (likely `scripts/build_datasets.py`, `scripts/prepa
 
 ```bash
 for cfg in configs/runs/mask_set{a,b}_d{1,2,3}.yaml configs/runs/mix_set{a,b}_d{1,2,3}.yaml; do
-  .venv/bin/python -m pad_synth_face.cli run --config "$cfg"
+  .venv/bin/python -m pad_synth_face.cli generate --config "$cfg"
 done
 ```
 
@@ -876,7 +876,7 @@ Pick one config, regen, and inspect a manifest entry:
 
 ```bash
 rm -rf datasets/mask_seta_d3
-.venv/bin/python -m pad_synth_face.cli run --config configs/runs/mask_seta_d3.yaml
+.venv/bin/python -m pad_synth_face.cli generate --config configs/runs/mask_seta_d3.yaml
 head -1 datasets/mask_seta_d3/manifest.jsonl | python3 -m json.tool | grep -E "lens_k1|motion_blur|jpeg_passes"
 ```
 
@@ -888,7 +888,7 @@ Expected: the manifest entry's `sensor_params` block contains `lens_k1`, `motion
 for cfg in configs/runs/mask_setb_d3.yaml configs/runs/mask_set{a,b}_d{1,2}.yaml configs/runs/mix_set{a,b}_d{1,2,3}.yaml; do
   ds=$(basename "$cfg" .yaml)
   rm -rf "datasets/$ds"
-  .venv/bin/python -m pad_synth_face.cli run --config "$cfg"
+  .venv/bin/python -m pad_synth_face.cli generate --config "$cfg"
 done
 ```
 

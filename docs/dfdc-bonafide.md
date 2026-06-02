@@ -103,7 +103,7 @@ swapping the dataset prefix to `dfdc_`:
 # 1. Generate the 6 synthetic datasets locally (uses the A2 sensor pipeline)
 for cfg in configs/runs/dfdc_set{a,b}_d{1,2,3}.yaml; do
   ds=$(basename "$cfg" .yaml); rm -rf "datasets/$ds"
-  .venv/bin/python -m pad_synth_face.cli run --config "$cfg"
+  .venv/bin/python -m pad_synth_face.cli generate --config "$cfg"
 done
 
 # 2. rsync code + the 6 dfdc_* datasets to the Spark, then run spark_sweep.py

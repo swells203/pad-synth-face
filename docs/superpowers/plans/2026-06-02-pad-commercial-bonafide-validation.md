@@ -1032,7 +1032,7 @@ identical to the DFDC/A2 procedure, `commercial_` prefixes:
 ```bash
 for cfg in configs/runs/commercial_set{a,b}_d{1,2,3}.yaml; do
   ds=$(basename "$cfg" .yaml); rm -rf "datasets/$ds"
-  .venv/bin/python -m pad_synth_face.cli run --config "$cfg"
+  .venv/bin/python -m pad_synth_face.cli generate --config "$cfg"
 done
 # rsync code + the 6 commercial_* datasets to the Spark, then run
 # spark_sweep.py over the L4 cells -> runs_commercial_224_L4/ ; pull back.
