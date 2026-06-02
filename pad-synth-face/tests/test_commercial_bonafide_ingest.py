@@ -94,3 +94,7 @@ def test_ingest_respects_max_per_identity(tmp_path):
         vendor="acme", max_per_identity=3,
     )
     assert summary["samples_written"] == 6  # 2 ids * 3 capped
+    # Verify capped files are actually resized to 224x224 PNGs.
+    sample_png = next((out / "subj_000").glob("*.png"))
+    with Image.open(sample_png) as im:
+        assert im.size == (224, 224)

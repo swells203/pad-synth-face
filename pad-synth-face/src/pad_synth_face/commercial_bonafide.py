@@ -48,8 +48,7 @@ def ingest_commercial_bonafide(
     n_skipped = 0
     for id_dir in sorted(p for p in src.iterdir() if p.is_dir()):
         out_dir = out / id_dir.name
-        out_dir.mkdir(exist_ok=True)
-        n_ids += 1
+        id_contributed = False
         kept = 0
         for sample_path in sorted(id_dir.iterdir()):
             if sample_path.suffix.lower() not in _IMG_EXT:
@@ -57,6 +56,9 @@ def ingest_commercial_bonafide(
             if max_per_identity is not None and kept >= max_per_identity:
                 break
             kept += 1
+            # Lazily create the output dir on first image file encountered.
+            out_dir.mkdir(parents=True, exist_ok=True)
+            id_contributed = True
             out_path = out_dir / f"{sample_path.stem}.png"
             if out_path.exists():
                 n_skipped += 1
@@ -65,6 +67,8 @@ def ingest_commercial_bonafide(
                 im = im.convert("RGB").resize((size, size), Image.LANCZOS)
                 im.save(out_path, format="PNG")
             n_written += 1
+        if id_contributed:
+            n_ids += 1
 
     sha_of_index = hashlib.sha256(
         "|".join(sorted(p.name for p in out.iterdir() if p.is_dir())).encode()

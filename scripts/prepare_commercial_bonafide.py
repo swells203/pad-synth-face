@@ -26,7 +26,8 @@ def main() -> None:
     ap.add_argument("--out", required=True, type=Path,
                     help="Destination bonafide root (use datasets/_real/commercial_224)")
     ap.add_argument("--license", required=True, help="Commercial licence / EULA string")
-    ap.add_argument("--source-url", required=True)
+    ap.add_argument("--source-url", required=True,
+                    help="URL the dataset was obtained from (recorded in provenance)")
     ap.add_argument("--vendor", default="unknown")
     ap.add_argument("--max-per-identity", type=int, default=None)
     args = ap.parse_args()
