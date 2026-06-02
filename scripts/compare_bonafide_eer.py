@@ -27,9 +27,16 @@ _DEFAULT_BASELINE = (
 def aggregate(sweep_dir: Path) -> dict[tuple[str, str], dict[str, Any]]:
     """Group cell JSONs by (capacity, data_level) -> aggregated stats."""
     rows: dict[tuple[str, str], list[dict[str, Any]]] = {}
-    for f in sorted((Path(sweep_dir) / "runs").glob("*.json")):
+    runs_dir = Path(sweep_dir) / "runs"
+    found_any = False
+    for f in sorted(runs_dir.glob("*.json")):
+        found_any = True
         r = json.loads(f.read_text())
+        if "eer_cross_domain" not in r:
+            raise ValueError(f"missing 'eer_cross_domain' in {f}")
         rows.setdefault((r["capacity"], r["data_level"]), []).append(r)
+    if not found_any:
+        raise ValueError(f"no cell JSON files in {runs_dir}")
     agg: dict[tuple[str, str], dict[str, Any]] = {}
     for key, rs in rows.items():
         eers = [r["eer_cross_domain"] for r in rs]
@@ -91,13 +98,13 @@ def compare(
 
 def _render(result: dict[str, Any], band: float) -> str:
     lines = [
-        f"Commercial-bonafide vs DigiFace baseline (band ±{band:.3f})",
+        f"Commercial-bonafide vs DigiFace baseline (band +/-{band:.3f})",
         "",
-        f"{'cell':<8} {'DigiFace':>9} {'Commercial':>11} {'Δ':>8}  verdict",
+        f"{'cell':<8} {'DigiFace':>9} {'Commercial':>11} {'delta':>8}  verdict",
         "-" * 48,
     ]
     for r in result["rows"]:
-        cell = f"{r['capacity']}·{r['data_level']}"
+        cell = f"{r['capacity']}-{r['data_level']}"
         lines.append(
             f"{cell:<8} {r['baseline_mean']:>9.3f} {r['commercial_mean']:>11.3f} "
             f"{r['delta']:>+8.3f}  {r['verdict']}"

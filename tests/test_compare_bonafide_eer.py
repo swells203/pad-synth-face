@@ -84,3 +84,20 @@ def test_main_exits_nonzero_on_fail(tmp_path, capsys):
     assert rc == 1
     out = capsys.readouterr().out
     assert "FAIL" in out
+
+
+def test_compare_warns_and_renders_one_dir_only_cells(tmp_path):
+    base = tmp_path / "base"
+    comm = tmp_path / "comm"
+    _write_cell(base, "L4", "D3", 0, 0.06)
+    _write_cell(comm, "L4", "D3", 0, 0.06)
+    _write_cell(base, "L4", "D2", 0, 0.06)   # baseline-only cell
+    _write_cell(comm, "L4", "D1", 0, 0.06)   # commercial-only cell
+    result = cbe.compare(cbe.aggregate(base), cbe.aggregate(comm),
+                         band=0.03, collapse=0.001)
+    joined = " ".join(result["warnings"])
+    assert "D2" in joined and "baseline only" in joined
+    assert "D1" in joined and "commercial only" in joined
+    # _render must surface warnings in its text output
+    rendered = cbe._render(result, band=0.03)
+    assert "WARNING" in rendered
