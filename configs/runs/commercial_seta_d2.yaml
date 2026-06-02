@@ -1,0 +1,26 @@
+run:
+  name: commercial_seta_d2
+  output: ./datasets/commercial_seta_d2
+  seed: 20260522
+  deterministic: true
+
+modality: face
+
+bonafide:
+  root: ./datasets/_real/commercial_224
+  samples_per_bonafide: 32
+  identities_file: ./configs/commercial_identities_seta.txt
+  splits:
+    train: 0.0
+    dev: 0.0
+    test: 1.0
+
+attacks:
+  print:
+    weight: 1.0
+    ontology: ./ontology/face/print.yaml
+  replay:
+    weight: 1.0
+    ontology: ./ontology/face/replay.yaml
+
+sensor_preset: mobile-front-2024
