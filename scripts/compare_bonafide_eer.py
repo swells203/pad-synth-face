@@ -4,7 +4,7 @@ commercially-licensed set preserve cross-domain EER?
 
 Reads two sweep output dirs (each <dir>/runs/<CAP>_<DLEVEL>_<seed>.json with
 eer_cross_domain), aggregates by (capacity, data_level), and prints a per-cell
-delta table. PASS iff every shared cell has |Δ| <= band AND no commercial cell
+delta table. PASS iff every shared cell has |delta| <= band AND no commercial cell
 mean <= collapse. Exits non-zero on FAIL. See
 docs/superpowers/specs/2026-06-02-pad-commercial-bonafide-validation-design.md.
 """
@@ -77,7 +77,7 @@ def compare(
            b.get("n_val_cross_domain") != c.get("n_val_cross_domain"):
             warnings.append(
                 f"{cap}/{d}: scale mismatch (baseline n_train={b.get('n_train')}, "
-                f"commercial n_train={c.get('n_train')}) — not matched-scale"
+                f"commercial n_train={c.get('n_train')}) - not matched-scale"
             )
         rows.append({
             "capacity": cap, "data_level": d,
@@ -87,9 +87,9 @@ def compare(
     only_base = sorted(set(baseline) - set(commercial))
     only_comm = sorted(set(commercial) - set(baseline))
     for cap, d in only_base:
-        warnings.append(f"{cap}/{d}: present in baseline only — not compared")
+        warnings.append(f"{cap}/{d}: present in baseline only - not compared")
     for cap, d in only_comm:
-        warnings.append(f"{cap}/{d}: present in commercial only — not compared")
+        warnings.append(f"{cap}/{d}: present in commercial only - not compared")
     if not shared:
         passed = False
         warnings.append("no shared cells between the two sweeps")
@@ -112,8 +112,8 @@ def _render(result: dict[str, Any], band: float) -> str:
     for w in result["warnings"]:
         lines.append(f"  WARNING: {w}")
     lines.append("")
-    lines.append("PASS — commercial bonafide ships" if result["passed"]
-                 else "FAIL — commercial bonafide does NOT preserve EER")
+    lines.append("PASS - commercial bonafide ships" if result["passed"]
+                 else "FAIL - commercial bonafide does NOT preserve EER")
     return "\n".join(lines)
 
 
