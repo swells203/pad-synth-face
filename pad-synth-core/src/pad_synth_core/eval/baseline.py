@@ -292,6 +292,102 @@ def pretrain_on_synth(
     return model
 
 
+def finetune_and_eval_on_real(
+    pretrained_state: dict[str, Any],
+    model_factory: Callable[[], nn.Module],
+    finetune_ds: Dataset,
+    real_test_ds: Dataset,
+    mode: str = "full",
+    epochs: int = 8,
+    lr: float = 1e-4,
+    batch_size: int = 8,
+    seed: int = 0,
+    device: str | None = None,
+    target_apcer: float = 0.05,
+) -> dict[str, Any]:
+    """Load pretrained weights, optionally finetune on finetune_ds, eval on
+    real_test_ds. n_real == len(finetune_ds); n_real == 0 skips finetuning
+    (synth-only baseline). Real-test numbers populate the cross-domain keys;
+    the ISO threshold is fixed on the finetune set and applied to real-test
+    (None when there is no finetune set)."""
+    if mode not in ("full", "head"):
+        raise ValueError(f"unknown finetune mode: {mode!r} (use 'full' or 'head')")
+
+    torch.manual_seed(seed)
+    dev = torch.device(device) if device else torch.device("cpu")
+    model = model_factory().to(dev)
+    model.load_state_dict(pretrained_state)
+    n_real = len(finetune_ds)
+
+    if mode == "head":
+        if not hasattr(model, "fc"):
+            raise ValueError(
+                "head mode requires a ResNet-style .fc head; this model has "
+                "none (use mode='full')")
+        for name, p in model.named_parameters():
+            p.requires_grad = name.startswith("fc.")
+
+    in_eer: float | None = None
+    in_acc: float | None = None
+    threshold: float | None = None
+    if n_real > 0:
+        ft_dl = DataLoader(finetune_ds, batch_size=batch_size, shuffle=True)
+        params = [p for p in model.parameters() if p.requires_grad]
+        opt = torch.optim.Adam(params, lr=lr)
+        loss_fn = nn.CrossEntropyLoss()
+        for _ in range(epochs):
+            model.train()
+            for x, y in ft_dl:
+                x, y = x.to(dev), y.to(dev)
+                opt.zero_grad()
+                loss_fn(model(x), y).backward()
+                opt.step()
+        model.eval()
+        ft_scores, ft_labels, ft_atypes = _score_dataset(model, finetune_ds, batch_size, dev)
+        in_eer = compute_eer(ft_scores, ft_labels)
+        in_acc = (
+            sum(int((s >= 0.5) == y) for s, y in zip(ft_scores, ft_labels, strict=True))
+            / max(len(ft_scores), 1)
+        )
+        if any(t is not None for t in ft_atypes):
+            thr, _ = threshold_at_apcer(ft_scores, ft_labels, ft_atypes, target_apcer)
+            threshold = float(thr)
+
+    model.eval()
+    test_scores, test_labels, test_atypes = _score_dataset(model, real_test_ds, batch_size, dev)
+    real_eer = compute_eer(test_scores, test_labels)
+    real_acc = (
+        sum(int((s >= 0.5) == y) for s, y in zip(test_scores, test_labels, strict=True))
+        / max(len(test_scores), 1)
+    )
+
+    apcer_per_pai: dict[str, float] | None = None
+    apcer_max: float | None = None
+    bpcer: float | None = None
+    acer: float | None = None
+    if threshold is not None:
+        apcer_per_pai, apcer_max, bpcer, acer = apcer_bpcer_acer(
+            test_scores, test_labels, test_atypes, threshold)
+
+    return {
+        "n_real": n_real,
+        "mode": mode,
+        "eer_in_domain": in_eer,
+        "val_accuracy_in_domain": in_acc,
+        "n_train": n_real,
+        "n_val_in_domain": n_real,
+        "eer_cross_domain": real_eer,
+        "val_accuracy_cross_domain": real_acc,
+        "n_val_cross_domain": len(real_test_ds),
+        "threshold": threshold,
+        "target_apcer": float(target_apcer),
+        "apcer_cross_domain": apcer_max,
+        "bpcer_cross_domain": bpcer,
+        "acer_cross_domain": acer,
+        "apcer_per_pai_cross_domain": apcer_per_pai,
+    }
+
+
 def train_and_eval_tiny_cnn(
     dataset_root: Path,
     epochs: int = 1,

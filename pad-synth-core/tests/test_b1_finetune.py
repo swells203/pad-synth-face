@@ -9,7 +9,11 @@ import numpy as np
 import torch
 from PIL import Image
 
-from pad_synth_core.eval.baseline import TinyPADDataset, pretrain_on_synth
+from pad_synth_core.eval.baseline import (
+    TinyPADDataset,
+    finetune_and_eval_on_real,
+    pretrain_on_synth,
+)
 from pad_synth_core.eval.models_zoo import make_resnet18, make_tiny_cnn  # noqa: F401  (make_resnet18 used from Task 2 on)
 
 
@@ -42,3 +46,59 @@ def test_pretrain_on_synth_returns_trained_model(tmp_path):
     # Model produces 2-class logits on a 64x64 RGB batch.
     out = model(torch.zeros(2, 3, 64, 64))
     assert out.shape == (2, 2)
+
+
+def _state_of(model):
+    return {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+
+def test_finetune_full_mode_updates_backbone(tmp_path):
+    synth, real = tmp_path / "synth", tmp_path / "real"
+    _make_pad_tree(synth)
+    _make_pad_tree(real, n_bonafide=8, n_attack=8)
+    model = pretrain_on_synth(synth, make_resnet18, epochs=1, batch_size=4, seed=0)
+    state = _state_of(model)
+    real_ds = TinyPADDataset(real)
+    ft_ds = torch.utils.data.Subset(real_ds, list(range(8)))
+    test_ds = torch.utils.data.Subset(real_ds, list(range(8, 16)))
+    res = finetune_and_eval_on_real(
+        state, make_resnet18, ft_ds, test_ds,
+        mode="full", epochs=2, lr=1e-3, batch_size=4, seed=0)
+    assert res["n_real"] == 8
+    assert res["mode"] == "full"
+    assert res["eer_cross_domain"] is not None
+    assert res["n_val_cross_domain"] == 8
+    assert res["eer_in_domain"] is not None
+
+
+def test_finetune_n_real_zero_is_synth_only_baseline(tmp_path):
+    synth, real = tmp_path / "synth", tmp_path / "real"
+    _make_pad_tree(synth)
+    _make_pad_tree(real, n_bonafide=6, n_attack=6)
+    model = pretrain_on_synth(synth, make_tiny_cnn, epochs=1, batch_size=4, seed=0)
+    state = _state_of(model)
+    real_ds = TinyPADDataset(real)
+    empty_ft = torch.utils.data.Subset(real_ds, [])
+    test_ds = torch.utils.data.Subset(real_ds, list(range(12)))
+    res = finetune_and_eval_on_real(
+        state, make_tiny_cnn, empty_ft, test_ds,
+        mode="full", epochs=2, batch_size=4, seed=0)
+    assert res["n_real"] == 0
+    assert res["eer_cross_domain"] is not None        # real-test still evaluated
+    assert res["eer_in_domain"] is None               # no finetune set
+    assert res["threshold"] is None                   # no dev set -> no ISO threshold
+    assert res["acer_cross_domain"] is None
+
+
+def test_finetune_rejects_unknown_mode(tmp_path):
+    synth, real = tmp_path / "synth", tmp_path / "real"
+    _make_pad_tree(synth)
+    _make_pad_tree(real)
+    model = pretrain_on_synth(synth, make_tiny_cnn, epochs=1, batch_size=4, seed=0)
+    state = _state_of(model)
+    real_ds = TinyPADDataset(real)
+    ft_ds = torch.utils.data.Subset(real_ds, list(range(4)))
+    test_ds = torch.utils.data.Subset(real_ds, list(range(4, 8)))
+    import pytest
+    with pytest.raises(ValueError):
+        finetune_and_eval_on_real(state, make_tiny_cnn, ft_ds, test_ds, mode="bogus")
