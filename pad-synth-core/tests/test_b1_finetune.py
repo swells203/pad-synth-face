@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 from PIL import Image
 
@@ -52,7 +53,7 @@ def _state_of(model):
     return {k: v.cpu().clone() for k, v in model.state_dict().items()}
 
 
-def test_finetune_full_mode_updates_backbone(tmp_path):
+def test_finetune_full_mode_returns_valid_metrics(tmp_path):
     synth, real = tmp_path / "synth", tmp_path / "real"
     _make_pad_tree(synth)
     _make_pad_tree(real, n_bonafide=8, n_attack=8)
@@ -69,6 +70,27 @@ def test_finetune_full_mode_updates_backbone(tmp_path):
     assert res["eer_cross_domain"] is not None
     assert res["n_val_cross_domain"] == 8
     assert res["eer_in_domain"] is not None
+
+
+def test_finetune_full_mode_moves_backbone(tmp_path):
+    import torch as _t
+    synth, real = tmp_path / "synth", tmp_path / "real"
+    _make_pad_tree(synth)
+    _make_pad_tree(real, n_bonafide=8, n_attack=8)
+    model = pretrain_on_synth(synth, make_resnet18, epochs=1, batch_size=4, seed=0)
+    state = _state_of(model)
+    real_ds = TinyPADDataset(real)
+    ft_ds = _t.utils.data.Subset(real_ds, list(range(8)))
+    m = make_resnet18()
+    m.load_state_dict(state)
+    before_backbone = m.conv1.weight.detach().clone()
+    opt = _t.optim.Adam(m.parameters(), lr=1e-2)   # full: all params
+    loss_fn = _t.nn.CrossEntropyLoss()
+    dl = _t.utils.data.DataLoader(ft_ds, batch_size=4, shuffle=True)
+    for _ in range(3):
+        for x, y in dl:
+            opt.zero_grad(); loss_fn(m(x), y).backward(); opt.step()
+    assert not _t.equal(m.conv1.weight, before_backbone)   # full mode moves backbone
 
 
 def test_finetune_n_real_zero_is_synth_only_baseline(tmp_path):
@@ -99,6 +121,5 @@ def test_finetune_rejects_unknown_mode(tmp_path):
     real_ds = TinyPADDataset(real)
     ft_ds = torch.utils.data.Subset(real_ds, list(range(4)))
     test_ds = torch.utils.data.Subset(real_ds, list(range(4, 8)))
-    import pytest
     with pytest.raises(ValueError):
         finetune_and_eval_on_real(state, make_tiny_cnn, ft_ds, test_ds, mode="bogus")

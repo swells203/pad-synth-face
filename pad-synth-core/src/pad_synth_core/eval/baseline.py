@@ -278,7 +278,7 @@ def pretrain_on_synth(
     torch.manual_seed(seed)
     dev = torch.device(device) if device else torch.device("cpu")
     ds = TinyPADDataset(synth_root)
-    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
+    dl = DataLoader(ds, batch_size=batch_size, shuffle=True, generator=torch.Generator().manual_seed(seed))
     model = model_factory().to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
@@ -309,7 +309,14 @@ def finetune_and_eval_on_real(
     real_test_ds. n_real == len(finetune_ds); n_real == 0 skips finetuning
     (synth-only baseline). Real-test numbers populate the cross-domain keys;
     the ISO threshold is fixed on the finetune set and applied to real-test
-    (None when there is no finetune set)."""
+    (None when there is no finetune set).
+
+    NOTE: the in-domain keys (eer_in_domain, val_accuracy_in_domain,
+    n_val_in_domain) are the model's fit on the FINETUNE SET ITSELF (re-scored
+    after training, no held-out split) — unlike train_and_cross_domain_eval's
+    disjoint val split. They indicate finetune-set fit, not generalisation. The
+    curve's generalisation signal is eer_cross_domain (the real-test set).
+    """
     if mode not in ("full", "head"):
         raise ValueError(f"unknown finetune mode: {mode!r} (use 'full' or 'head')")
 
@@ -331,7 +338,7 @@ def finetune_and_eval_on_real(
     in_acc: float | None = None
     threshold: float | None = None
     if n_real > 0:
-        ft_dl = DataLoader(finetune_ds, batch_size=batch_size, shuffle=True)
+        ft_dl = DataLoader(finetune_ds, batch_size=batch_size, shuffle=True, generator=torch.Generator().manual_seed(seed))
         params = [p for p in model.parameters() if p.requires_grad]
         opt = torch.optim.Adam(params, lr=lr)
         loss_fn = nn.CrossEntropyLoss()
@@ -343,6 +350,7 @@ def finetune_and_eval_on_real(
                 loss_fn(model(x), y).backward()
                 opt.step()
         model.eval()
+        # Train-set self-score: re-scores the finetune set itself (no held-out split).
         ft_scores, ft_labels, ft_atypes = _score_dataset(model, finetune_ds, batch_size, dev)
         in_eer = compute_eer(ft_scores, ft_labels)
         in_acc = (
