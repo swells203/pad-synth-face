@@ -32,7 +32,16 @@ from pad_synth_core.eval.models_zoo import FACTORIES  # noqa: E402
 
 
 def split_real(real_root: Path, test_fraction: float, seed: int):
-    """Split the real set into (real_ds, pool_indices, test_ds), subject-disjoint.
+    """Split the real set into (real_ds, pool_indices, test_ds).
+
+    The split is only as subject-disjoint as the manifest's subject ids: it keys
+    on `bonafide_source.id`. On ingests where that id is unique per file (e.g.
+    the AxonData real-attack ingest, which sets it to the source file path), the
+    split degrades to SAMPLE-disjoint -- it does NOT guarantee a person is absent
+    from both pool and test (e.g. a selfie in pool and a print attack derived
+    from it in test). Before the real curve is trusted as leakage-free, the
+    real-attack manifest must carry a genuine per-person id. No leakage risk for
+    the n=55 plumbing run (EER is meaningless at that scale).
 
     Guards that the test partition holds both classes -- EER is undefined on a
     single-class test set, so a degenerate split raises rather than emitting a

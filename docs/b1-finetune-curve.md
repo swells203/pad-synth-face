@@ -48,6 +48,17 @@ run on the Spark (`--device cuda`); the finetunes are cheap.
 - The real N=0/50/200/1000 curve needs purchased/larger real data — the same
   data step that unblocks the commercial-bonafide validation. Until then this is
   validated scaffolding: mechanically proven, awaiting data.
+- **The pool/test split is only as subject-disjoint as the real manifest's
+  `bonafide_source.id`.** The AxonData ingest sets that id to the source *file
+  path* (unique per image), so the split is currently **sample-disjoint, not
+  person-disjoint** — a person could appear as a bonafide selfie in the pool and
+  a derived attack in the test set (leakage). Before any real curve is trusted as
+  leakage-free, the real-attack ingest must emit a genuine per-person id. Inert
+  for the n=55 plumbing run (EER meaningless at that scale).
+- **ACER is not trustworthy below moderate N.** The ISO threshold is fixed on the
+  finetune set; at tiny N (or a single-class N-slice) it can be a degenerate
+  sentinel. Read the threshold-free `eer_cross_domain` as the curve's signal;
+  treat `acer_cross_domain` as indicative only until N is reasonably large.
 
 ## Mechanical dry-run (no purchase needed)
 
