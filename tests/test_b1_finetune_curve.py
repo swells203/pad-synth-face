@@ -89,3 +89,46 @@ def test_main_returns_zero(tmp_path):
         "--pretrain-epochs", "1", "--finetune-epochs", "1",
         "--output-dir", str(out), "--seed", "0"])
     assert rc == 0
+
+
+def test_render_curve_text_and_no_baseline_note():
+    helps = {"mode": "full", "n_test": 8, "pool_size": 10, "rows": [
+        {"n_real": 0, "eer": 0.40, "acer": None, "skipped": False},
+        {"n_real": 4, "eer": 0.30, "acer": 0.2, "skipped": False},
+    ]}
+    out = b1._render_curve(helps)
+    assert "finetuning helps" in out
+    assert "N=0" in out and "N=4" in out
+    # No N=0 baseline -> explicit note, no verdict.
+    no_base = {"mode": "full", "n_test": 8, "pool_size": 10, "rows": [
+        {"n_real": 4, "eer": 0.30, "acer": 0.2, "skipped": False},
+    ]}
+    out2 = b1._render_curve(no_base)
+    assert "verdict omitted" in out2
+
+
+def test_run_curve_head_mode_through_runner(tmp_path):
+    from pad_synth_core.eval.models_zoo import make_resnet18
+    synth, real, out = tmp_path / "synth", tmp_path / "real", tmp_path / "out"
+    _make_pad_tree(synth, 8, 8)
+    _make_pad_tree(real, 12, 12)
+    summary = b1.run_curve(
+        synth_root=synth, real_root=real, n_list=[0, 4],
+        output_dir=out, model_factory=make_resnet18, mode="head",
+        test_fraction=0.4, pretrain_epochs=1, finetune_epochs=1,
+        finetune_lr=1e-2, batch_size=4, seed=0, device=None)
+    assert summary["mode"] == "head"
+    r4 = json.loads((out / "runs" / "N4_seed0.json").read_text())
+    assert r4["mode"] == "head" and r4["eer_cross_domain"] is not None
+
+
+def test_main_rejects_negative_n(tmp_path):
+    synth, real, out = tmp_path / "synth", tmp_path / "real", tmp_path / "out"
+    _make_pad_tree(synth, 8, 8)
+    _make_pad_tree(real, 12, 12)
+    with pytest.raises(SystemExit):   # argparse ap.error raises SystemExit
+        b1.main([
+            "--synth-root", str(synth), "--real-root", str(real),
+            "--n-list", "0,-4", "--model", "L1", "--test-fraction", "0.4",
+            "--pretrain-epochs", "1", "--finetune-epochs", "1",
+            "--output-dir", str(out), "--seed", "0"])

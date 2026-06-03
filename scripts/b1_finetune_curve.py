@@ -108,8 +108,10 @@ def _render_curve(summary: dict[str, Any]) -> str:
             lines.append(f"{r['n_real']:>8} {eer:>14} {acer:>8}")
     lines.append("")
     base = next((r for r in done if r["n_real"] == 0), None)
-    top = done[-1] if done else None
-    if base is not None and top is not None and top["n_real"] > 0 \
+    top = max(done, key=lambda r: r["n_real"]) if done else None
+    if base is None:
+        lines.append("(no N=0 baseline in n-list; finetuning verdict omitted)")
+    elif top is not None and top["n_real"] > 0 \
             and base["eer"] is not None and top["eer"] is not None:
         delta = top["eer"] - base["eer"]
         verdict = "helps" if delta < 0 else ("no change" if delta == 0 else "hurts")
@@ -137,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     n_list = [int(x) for x in args.n_list.split(",") if x.strip() != ""]
+    if any(n < 0 for n in n_list):
+        ap.error("--n-list values must be non-negative")
+    n_list = sorted(set(n_list))   # dedupe (avoid JSON overwrites) + predictable order
     summary = run_curve(
         synth_root=args.synth_root, real_root=args.real_root, n_list=n_list,
         output_dir=args.output_dir, model_factory=FACTORIES[args.model],
