@@ -1,0 +1,29 @@
+{
+  "capacity": "L4",
+  "data_level": "D1",
+  "seed": 0,
+  "n_train": 3072,
+  "n_val_in_domain": 1024,
+  "n_val_cross_domain": 55,
+  "eer_in_domain": 0.19921875,
+  "eer_cross_domain": 0.49193548387096775,
+  "val_accuracy_in_domain": 0.74609375,
+  "val_accuracy_cross_domain": 0.5636363636363636,
+  "train_seconds": 47.8334379196167,
+  "git_sha": "56e6218",
+  "torch_version": "2.12.0.dev20260407+cu128",
+  "cuda_version": "12.8",
+  "device": "cuda",
+  "train_root": "datasets/mix_seta_d3",
+  "eval_root": "datasets/_real_attack/axondata",
+  "threshold": 0.20195727050304413,
+  "target_apcer": 0.05,
+  "apcer_cross_domain": 0.0,
+  "bpcer_cross_domain": 1.0,
+  "acer_cross_domain": 0.5,
+  "apcer_per_pai_cross_domain": {
+    "mask": 0.0,
+    "print": 0.0,
+    "replay": 0.0
+  }
+}
