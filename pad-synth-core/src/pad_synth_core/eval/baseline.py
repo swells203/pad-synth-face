@@ -260,6 +260,38 @@ def train_and_cross_domain_eval(
     }
 
 
+def pretrain_on_synth(
+    synth_root: Path,
+    model_factory: Callable[[], nn.Module],
+    epochs: int = 8,
+    lr: float = 1e-3,
+    batch_size: int = 8,
+    seed: int = 0,
+    device: str | None = None,
+) -> nn.Module:
+    """Pretrain a fresh model_factory() model on the FULL synthetic root.
+
+    No val split -- pretraining uses all of synth_root. Returns the trained
+    model; the B1 runner snapshots state_dict() once and forks the finetune
+    curve from it. Same Adam/CE loop as train_and_cross_domain_eval.
+    """
+    torch.manual_seed(seed)
+    dev = torch.device(device) if device else torch.device("cpu")
+    ds = TinyPADDataset(synth_root)
+    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
+    model = model_factory().to(dev)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.CrossEntropyLoss()
+    for _ in range(epochs):
+        model.train()
+        for x, y in dl:
+            x, y = x.to(dev), y.to(dev)
+            opt.zero_grad()
+            loss_fn(model(x), y).backward()
+            opt.step()
+    return model
+
+
 def train_and_eval_tiny_cnn(
     dataset_root: Path,
     epochs: int = 1,
