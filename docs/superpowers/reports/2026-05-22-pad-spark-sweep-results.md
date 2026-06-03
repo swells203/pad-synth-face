@@ -638,3 +638,55 @@ Spec §2's branch 2 verbatim conclusion applies: *"The detector already saturate
 - L4+A2 mask: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mask_224_L4_A2/summary.csv)
 - L4+A2 mix: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/runs/`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/runs/) (9 files); summary CSV: [`./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/summary.csv`](./2026-05-22-pad-spark-sweep-results/runs_mix_224_L4_A2/summary.csv)
 - Configs unchanged from the B2 sweep (same `mask_*` / `mix_*` 224×224 datasets, regenerated with the A2 sensor pipeline); only the sensor differs.
+
+## 2026-06-03 update — synth→REAL REALITY CHECK (production stack vs the AxonData pilot)
+
+**The number the project actually hinges on.** Every cross-domain figure above is
+synth→**synth** (generalising across *synthetic* sets). This is the first
+synth→**real** measurement of the current production model (B2 pretrained
+ResNet18 + A2 capture chain), and the first since the 2026-05-27 pilot — which
+predated B2 and A2.
+
+**Setup:** `make_resnet18_pretrained` (L4) trained on synthetic `mix_seta_d3`
+(DigiFace bonafide + synthetic print+replay+mask, A2 sensor chain, 4096 samples,
+n_train=3072 after the subject-disjoint dev split), Adam lr=1e-3, 8 epochs,
+evaluated cross-domain on the **real** `datasets/_real_attack/axondata` set
+(n=55: 24 bonafide + 31 attacks — 12 print / 12 replay / 7 mask, matching the
+synthetic attack mix). 3 seeds on the Spark GB10 (code SHA 56e6218, ~47 s/cell).
+
+### Result
+
+| Metric | synth→REAL (this run) | for reference |
+|---|---|---|
+| **cross-domain EER** | **0.400 ± 0.083** (seeds 0.492 / 0.291 / 0.418) | synth→synth mix·D3 = **0.055**; 2026-05-27 pilot ≈ **0.50** (chance) |
+| in-domain EER (synth dev) | 0.222 | — |
+| ACER @ 5% APCER (real) | **0.486** (seeds 0.50 / 0.50 / 0.458) | operating point **collapsed** |
+| per-PAI APCER (seed 0) | print 0.0 / replay 0.0 / mask 0.0 | at the synth-fixed threshold the model rejects ~everything → BPCER ≈ 1.0 |
+
+### Headline finding
+
+**The synthetic pipeline does not yet produce a model that works on real
+attacks.** A detector that scores 0.055 on synthetic cross-domain scores **0.40
+on real** — 7× worse and barely better than chance. B2+A2 moved real EER from
+≈0.50 (2026-05-27) to ≈0.40 — a real but small, noisy improvement, not a usable
+one. The ACER ≈ 0.5 with the synth-fixed threshold rejecting nearly all samples
+confirms the score distributions don't transfer: the operating point you'd ship
+is worthless. The strong synth→synth numbers are a **vanity metric** for real
+deployment.
+
+**Caveats:** n=55 (24 identities) is tiny → 0.40 ± 0.08 is directional, not
+definitive (one seed hit 0.29). But the 0.055→0.40 *gap* is far too large to be a
+small-sample artifact — it is the real synth→real gap, and it is large.
+
+### Phase implication
+
+The open question is no longer "is synthetic good enough" (answered: no) but
+"**does real finetune data rescue it**" — exactly what the B1 harness
+(`docs/b1-finetune-curve.md`) measures, with this 0.40 as the N=0 point. This
+*raises* the value of real data: it is now needed to train/finetune, not just to
+validate, and a commercial-data purchase should be judged on whether it pulls
+the B1 curve to a usable EER. Synthetic-only polishing is deprioritised.
+
+### Raw results
+
+- synth→real L4: [`./2026-05-22-pad-spark-sweep-results/runs_synthreal_axon_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_synthreal_axon_L4/runs/) (3 files). Train `mix_seta_d3` (synth) → eval `_real_attack/axondata` (real).
