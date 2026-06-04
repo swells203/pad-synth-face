@@ -140,3 +140,48 @@ def test_end_to_end_stage_then_ingest_person_ids(tmp_path):
     # person ids, NOT file paths
     assert ids == {"subjA", "subjB", "subjC", "subjD"}
     assert all("/" not in i for i in ids)
+
+
+def test_fixture_b1_chain_runs(tmp_path):
+    """stage -> ingest -> B1 run_curve on a CelebA-shaped fixture (plumbing)."""
+    import importlib.util
+    from pad_synth_face.real_attack import ingest_real_attack
+    from pad_synth_core.eval.models_zoo import make_tiny_cnn
+
+    # Bigger fixture so the split has both classes on each side.
+    src = tmp_path / "celeba"
+    rng = np.random.default_rng(1)
+    labels = {}
+    def _img(relpath, code):
+        p = src / relpath
+        p.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(rng.integers(0, 256, (80, 80, 3), dtype=np.uint8)).save(p)
+        labels[relpath] = _lbl(code)
+    for s in range(8):
+        _img(f"Data/train/subj{s}/live/0.jpg", 0)
+        _img(f"Data/train/subj{s}/spoof/1.jpg", 1 if s % 2 else 7)
+    (src / "metas" / "intra_test").mkdir(parents=True, exist_ok=True)
+    (src / "metas" / "intra_test" / "train_label.json").write_text(json.dumps(labels))
+
+    staging, out = tmp_path / "staging", tmp_path / "out"
+    stage_celeba_spoof(src, staging, splits=("train",))
+
+    def subject_id_fn(fp: Path) -> str:
+        parts = fp.relative_to(staging).parts
+        return parts[1] if parts[0] == "bonafide" else parts[2]
+    ingest_real_attack(
+        src=staging, out=out, dataset_name="CelebA-Spoof", license="nc",
+        source_url="u", subject_id_fn=subject_id_fn)
+
+    # Load the B1 runner and run a tiny curve: use the ingested celeba fixture as
+    # both synth (pretrain) and real (finetune/test) root -- a pure plumbing
+    # check that stage->ingest->B1 connects; EER values are meaningless.
+    spec = importlib.util.spec_from_file_location(
+        "b1", Path(__file__).resolve().parents[2] / "scripts" / "b1_finetune_curve.py")
+    b1 = importlib.util.module_from_spec(spec); spec.loader.exec_module(b1)
+    summary = b1.run_curve(
+        synth_root=out, real_root=out, n_list=[0, 2],
+        output_dir=tmp_path / "b1out", model_factory=make_tiny_cnn, mode="full",
+        test_fraction=0.4, pretrain_epochs=1, finetune_epochs=1,
+        finetune_lr=1e-3, batch_size=4, seed=0, device=None)
+    assert any(r["n_real"] == 2 and not r["skipped"] for r in summary["rows"])
