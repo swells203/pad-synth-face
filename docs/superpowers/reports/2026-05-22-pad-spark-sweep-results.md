@@ -723,6 +723,21 @@ mask a soft haloed blur that doesn't read as a rigid silicone/3D mask:
 
 ![Synthetic attack quartet: bonafide → print → replay → mask](../../figures/attack-quartet.png)
 
+**Mask generator — params are visually inert (2026-06-04).** Rendering 8 mask
+samples (same face, seeds 0–7) confirms the blur is *systematic*: all 8 render as
+the same soft haloed blur regardless of the sampled params. Material doesn't
+render (silicone/paper/resin look identical); specular doesn't appear (spec 0.99
+== spec 0.02); seams don't show (seam 0.81 == seam 0.01). So the mask generator
+produces **one blur effect with knobs that don't drive the output** — it isn't
+sampling a family of realistic masks. This is the concrete root cause of mask
+failing on real data (EER 0.67): the detector only ever sees "soft blur =
+attack," which looks nothing like a rigid silicone/3D mask. The
+material/seam/specular parameters exist in the API but aren't producing their
+visual effects — the highest-value attack-physics fix if the synthetic route is
+pursued.
+
+![Mask generator: 8 samples across seeds — systematic blur, inert params](../../figures/mask-samples.png)
+
 ## 2026-06-04 update — B1 PULSE on AxonData n=55 (weak/confounded; NOT a verdict)
 
 A quick B1 finetune-curve on the existing n=55 AxonData pilot — to pulse-check
