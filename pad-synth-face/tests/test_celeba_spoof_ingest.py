@@ -59,13 +59,13 @@ def test_stage_builds_class_symlink_tree(tmp_path):
     staging = tmp_path / "staging"
     counts = stage_celeba_spoof(src, staging, splits=("train",))
     # classes
-    assert (staging / "bonafide" / "subjA" / "0.jpg").is_symlink()
-    assert (staging / "attack" / "print" / "subjA" / "1.jpg").is_symlink()
-    assert (staging / "attack" / "replay" / "subjB" / "2.jpg").is_symlink()
-    assert (staging / "attack" / "mask" / "subjC" / "3.jpg").is_symlink()
-    assert (staging / "attack" / "mask" / "subjD" / "5.jpg").is_symlink()
+    assert (staging / "bonafide" / "subjA" / "live_0.jpg").is_symlink()
+    assert (staging / "attack" / "print" / "subjA" / "spoof_1.jpg").is_symlink()
+    assert (staging / "attack" / "replay" / "subjB" / "spoof_2.jpg").is_symlink()
+    assert (staging / "attack" / "mask" / "subjC" / "spoof_3.jpg").is_symlink()
+    assert (staging / "attack" / "mask" / "subjD" / "spoof_5.jpg").is_symlink()
     # code 5 (partial) excluded
-    assert not (staging / "attack" / "mask" / "subjD" / "4.jpg").exists()
+    assert not (staging / "attack" / "mask" / "subjD" / "spoof_4.jpg").exists()
     assert counts["bonafide"] == 1 and counts["print"] == 1
     assert counts["replay"] == 1 and counts["mask"] == 2
     assert counts["skipped"] == 1  # the code-5 image
@@ -110,7 +110,7 @@ def test_stage_is_idempotent_on_rerun(tmp_path):
     c1 = stage_celeba_spoof(src, staging, splits=("train",))
     c2 = stage_celeba_spoof(src, staging, splits=("train",))  # must not raise
     assert c1 == c2
-    assert (staging / "bonafide" / "subjA" / "0.jpg").is_symlink()
+    assert (staging / "bonafide" / "subjA" / "live_0.jpg").is_symlink()
 
 
 def test_end_to_end_stage_then_ingest_person_ids(tmp_path):

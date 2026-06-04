@@ -94,7 +94,10 @@ def stage_celeba_spoof(
         if cls is None:
             counts["skipped"] += 1
             continue
-        name = Path(relpath).name
+        # Unique per source image: join the path parts after Data/<split>/<subj>/
+        # so two images that share a basename (e.g. across nested folders) cannot
+        # collide in the staging tree.
+        name = "_".join(Path(relpath).parts[3:])
         if cls == "bonafide":
             dst = staging / "bonafide" / subj / name
         else:

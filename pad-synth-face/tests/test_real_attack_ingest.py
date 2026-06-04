@@ -123,8 +123,7 @@ def _build_subject_src(root: Path) -> Path:
 
 def _subject_of(staging: Path):
     def fn(fp: Path) -> str:
-        parts = fp.resolve().relative_to(staging.resolve()).parts
-        # bonafide/<subj>/<name>  OR  attack/<type>/<subj>/<name>
+        parts = fp.relative_to(staging).parts
         return parts[1] if parts[0] == "bonafide" else parts[2]
     return fn
 
