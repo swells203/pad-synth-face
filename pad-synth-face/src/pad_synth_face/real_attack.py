@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 from PIL import Image
@@ -61,6 +61,7 @@ def ingest_real_attack(
     license: str,
     source_url: str,
     max_per_class: int | None = None,
+    subject_id_fn: Callable[[Path], str] | None = None,
 ) -> dict[str, Any]:
     src, out = Path(src), Path(out)
     face_root = out / "face"
@@ -98,7 +99,10 @@ def ingest_real_attack(
                     label="bonafide" if attack_type is None else "attack",
                     attack_type=attack_type,
                     bonafide_source=BonafideSource(
-                        dataset=dataset_name, id=str(fp.relative_to(src)), license=license
+                        dataset=dataset_name,
+                        id=(subject_id_fn(fp) if subject_id_fn is not None
+                            else str(fp.relative_to(src))),
+                        license=license,
                     ),
                     pipeline_version=f"pad-synth-face@{pad_synth_face.__version__}",
                     core_version=f"pad-synth-core@{pad_synth_core.__version__}",
