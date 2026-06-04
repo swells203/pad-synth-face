@@ -723,20 +723,30 @@ mask a soft haloed blur that doesn't read as a rigid silicone/3D mask:
 
 ![Synthetic attack quartet: bonafide → print → replay → mask](../../figures/attack-quartet.png)
 
-**Mask generator — params are visually inert (2026-06-04).** Rendering 8 mask
-samples (same face, seeds 0–7) confirms the blur is *systematic*: all 8 render as
-the same soft haloed blur regardless of the sampled params. Material doesn't
-render (silicone/paper/resin look identical); specular doesn't appear (spec 0.99
-== spec 0.02); seams don't show (seam 0.81 == seam 0.01). So the mask generator
-produces **one blur effect with knobs that don't drive the output** — it isn't
-sampling a family of realistic masks. This is the concrete root cause of mask
-failing on real data (EER 0.67): the detector only ever sees "soft blur =
-attack," which looks nothing like a rigid silicone/3D mask. The
-material/seam/specular parameters exist in the API but aren't producing their
-visual effects — the highest-value attack-physics fix if the synthetic route is
-pursued.
+**Mask generator — root cause is the analytic-dome MODEL, not inert params
+(2026-06-04, corrected after instrumentation).** An initial eyeball read claimed
+the mask params were "visually inert." **Systematic-debugging instrumentation
+falsified that.** Toggling each param (fixed seed) produces real pixel change —
+mean |Δ|/255: surface_warp **24.6**, light_elevation **20.8**, material 7.6–9.3,
+seam 7.8, specular 4.8 — and the 8 seed-renders differ pairwise by **mean 24/255**
+(min 12, max 35). They are NOT identical; the params render as designed.
 
-![Mask generator: 8 samples across seeds — systematic blur, inert params](../../figures/mask-samples.png)
+What fooled the eye is a **shared synthetic *signature*** every mask carries: a
+~24% global darkening (face brightness 110 → masks 84), a soft texture-loss blur,
+and the **analytic elliptical-dome Lambertian "glow"** the module uses to fake 3D
+(its own docstring: *"No real 3D geometry: the '3D-ness' is faked with an analytic
+elliptical-dome shading field"*). That dome-glow/darkening/blur look is a synthetic
+**tell** real silicone/3D masks don't have (rigid edges, real material/specular,
+seams). So **mask fails on real (EER 0.67) not because synthetic masks are
+identical — they vary plenty — but because they share an *unrealistic
+characteristic appearance*** the detector learns ("dome-glow + darkened + soft =
+attack") and real masks lack. **This is a model-fidelity limitation, not a bug:**
+the params work; the 2D analytic-dome approximation simply can't look like a real
+mask. Closing it needs real 3D/material rendering (or, pragmatically, real mask
+data). The 8-sample figure below shows the perceptual similarity that prompted the
+(wrong) inert-params reading — corrected here.
+
+![Mask generator: 8 samples across seeds — perceptually similar (shared dome-glow signature) but pixel-distinct](../../figures/mask-samples.png)
 
 ## 2026-06-04 update — B1 PULSE on AxonData n=55 (weak/confounded; NOT a verdict)
 
