@@ -1,0 +1,32 @@
+{
+  "rows": [
+    {
+      "n_real": 0,
+      "eer": 0.38181818181818183,
+      "acer": null,
+      "skipped": false
+    },
+    {
+      "n_real": 8,
+      "eer": 0.42727272727272725,
+      "acer": 0.5,
+      "skipped": false
+    },
+    {
+      "n_real": 16,
+      "eer": 0.6181818181818182,
+      "acer": 0.55,
+      "skipped": false
+    },
+    {
+      "n_real": 32,
+      "eer": 0.6181818181818182,
+      "acer": 0.525,
+      "skipped": false
+    }
+  ],
+  "pool_size": 39,
+  "n_test": 16,
+  "mode": "full",
+  "seed": 2
+}
