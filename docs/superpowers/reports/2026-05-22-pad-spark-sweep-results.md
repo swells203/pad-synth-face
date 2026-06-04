@@ -690,3 +690,36 @@ the B1 curve to a usable EER. Synthetic-only polishing is deprioritised.
 ### Raw results
 
 - synth→real L4: [`./2026-05-22-pad-spark-sweep-results/runs_synthreal_axon_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_synthreal_axon_L4/runs/) (3 files). Train `mix_seta_d3` (synth) → eval `_real_attack/axondata` (real).
+
+## 2026-06-04 update — B1 PULSE on AxonData n=55 (weak/confounded; NOT a verdict)
+
+A quick B1 finetune-curve on the existing n=55 AxonData pilot — to pulse-check
+whether *any* real finetune moves the 0.40 before downloading CelebA-Spoof.
+**Heavily confounded; read it as plumbing, not signal.** L4 pretrained on
+synthetic `mix_seta_d3`, **full** finetune on the AxonData pool, eval on a
+held-out real test (16 samples), 3 seeds, on the Spark GB10.
+
+| N (real finetune) | real-test EER (mean ± std) | raw seeds |
+|---|---|---|
+| 0 (synth-only) | 0.42 ± 0.03 | 0.38 / 0.44 / 0.44 |
+| 8  | 0.39 ± 0.06 | 0.31 / 0.43 / 0.44 |
+| 16 | 0.50 ± 0.13 | 0.31 / 0.56 / 0.62 |
+| 32 | 0.46 ± 0.13 | 0.31 / 0.44 / 0.62 |
+
+**Read:** (1) N=0 = 0.42 reproduces the 2026-06-03 reality check (0.40) — the B1
+harness works end-to-end on real GPU data. (2) **No rescue signal** — the curve
+is flat-to-worse, every band overlaps N=0, std (±0.13) swamps any trend (one
+lucky seed sat at 0.31 throughout, the others rose). (3) **Why it's not a
+verdict:** n=55 / 16-sample test is statistically almost nothing; the AxonData
+per-file-id leakage that would *inflate* a rescue is present yet none appears;
+and full-finetuning an 11M-param ResNet on 8–32 images is textbook overfitting
+(the rise at N≥16 is likely overfit, not signal).
+
+**Implication:** does NOT say real finetune can't help — says *full-finetune on a
+tiny real set doesn't, and overfits*. Design hint for the real run: the
+CelebA-Spoof B1 curve should use **`--finetune-mode head`** (freeze backbone,
+robust at small N) and the larger N the 10k-subject set allows. The trustworthy,
+person-disjoint, big-N answer remains the CelebA-Spoof run
+(`docs/celeba-spoof-b1.md`).
+
+- raw: [`./2026-05-22-pad-spark-sweep-results/runs_b1_axon_pulse/runs/`](./2026-05-22-pad-spark-sweep-results/runs_b1_axon_pulse/runs/) (12 files = 4 N × 3 seeds).
