@@ -106,3 +106,51 @@ def test_max_per_class_caps_output(tmp_path):
         source_url="https://example.org/cap", max_per_class=2,
     )
     assert summary["counts"] == {"bonafide": 2, "print": 2, "replay": 2}
+
+
+def _build_subject_src(root: Path) -> Path:
+    """A real-attack src whose images live under <class>/<subject>/<name>."""
+    rng = np.random.default_rng(0)
+    def _img(p: Path):
+        p.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(rng.integers(0, 256, (96, 96, 3), dtype=np.uint8)).save(p)
+    _img(root / "bonafide" / "subjA" / "a0.png")
+    _img(root / "bonafide" / "subjB" / "b0.png")
+    _img(root / "attack" / "print" / "subjA" / "p0.png")
+    _img(root / "attack" / "replay" / "subjB" / "r0.png")
+    return root
+
+
+def _subject_of(staging: Path):
+    def fn(fp: Path) -> str:
+        parts = fp.resolve().relative_to(staging.resolve()).parts
+        # bonafide/<subj>/<name>  OR  attack/<type>/<subj>/<name>
+        return parts[1] if parts[0] == "bonafide" else parts[2]
+    return fn
+
+
+def test_subject_id_fn_sets_person_id(tmp_path):
+    src = _build_subject_src(tmp_path / "src")
+    out = tmp_path / "out"
+    ingest_real_attack(
+        src=src, out=out, dataset_name="SUBJ", license="x",
+        source_url="https://example.org/subj", subject_id_fn=_subject_of(src),
+    )
+    recs = [json.loads(l) for l in (out / "manifest.jsonl").read_text().splitlines()]
+    ids = {r["bonafide_source"]["id"] for r in recs}
+    # ids are the SUBJECT names, not file paths
+    assert ids == {"subjA", "subjB"}
+
+
+def test_subject_id_fn_none_preserves_relpath(tmp_path):
+    src = _build_subject_src(tmp_path / "src")
+    out = tmp_path / "out"
+    ingest_real_attack(
+        src=src, out=out, dataset_name="SUBJ", license="x",
+        source_url="https://example.org/subj",  # no subject_id_fn
+    )
+    recs = [json.loads(l) for l in (out / "manifest.jsonl").read_text().splitlines()]
+    ids = {r["bonafide_source"]["id"] for r in recs}
+    # back-compat: ids are source-relative file paths
+    assert any(i.endswith("a0.png") and "subjA" in i for i in ids)
+    assert all("/" in i for i in ids)
