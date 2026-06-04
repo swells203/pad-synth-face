@@ -691,6 +691,32 @@ the B1 curve to a usable EER. Synthetic-only polishing is deprioritised.
 
 - synth→real L4: [`./2026-05-22-pad-spark-sweep-results/runs_synthreal_axon_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_synthreal_axon_L4/runs/) (3 files). Train `mix_seta_d3` (synth) → eval `_real_attack/axondata` (real).
 
+### Per-PAI breakdown (threshold-free EER, 2026-06-04)
+
+The stored ACER/APCER per-PAI is degenerate (synth-fixed threshold collapses on
+real data → BPCER ≈ 1, APCER = 0 for every type). The honest per-type read is
+**threshold-free EER**: bonafide vs each attack type separately (`scripts/perpai_eer.py`,
+L4 on `mix_seta_d3`, 3 seeds). 0.5 = chance; below = signal; **above = worse than chance.**
+
+| bonafide vs… | EER (mean ± std) | raw seeds | n attacks |
+|---|---|---|---|
+| **print** | **0.38 ± 0.15** | 0.31 / 0.58 / 0.25 | 12 |
+| replay | 0.58 ± 0.07 | 0.50 / 0.67 / 0.58 | 12 |
+| **mask** | **0.67 ± 0.06** | 0.71 / 0.58 / 0.71 | 7 |
+| pooled | 0.49 ± 0.10 | — | 31 |
+
+**Finding (hypothesis-level, NOT a measurement):** the synth→real gap is
+**attack-type-specific**. Synthetic **print** transfers (0.38, real signal — it's
+the closest match to a real printed photo); **replay** barely (0.58); **mask
+actively fails** (0.67, worse than chance, consistent across all 3 seeds). Likely
+cause: real silicone/3D masks and screen replays have physical cues (material,
+specular, moiré) the synthetic *mask*/*replay* generators don't reproduce, so the
+detector never learned them. **Caveat — tiny n** (7 mask / 12 print / 12 replay /
+24 bonafide): per-PAI EER on ~30 points has huge error bars; treat as a steer, not
+a conclusion. **Implication:** the synthetic *mask* and *replay* attack physics are
+where the gap is widest — the place attack-physics work (or real data) would pay
+off most. Confirm/kill on the CelebA-Spoof run, which has far more mask/replay.
+
 ## 2026-06-04 update — B1 PULSE on AxonData n=55 (weak/confounded; NOT a verdict)
 
 A quick B1 finetune-curve on the existing n=55 AxonData pilot — to pulse-check
