@@ -15,6 +15,7 @@ Research-only data; never committed (datasets/ is gitignored).
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,9 @@ def _subject_of(image_relpath: str) -> str:
     """Subject = the path segment after Data/<split>/.  e.g.
     'Data/train/2880/live/x.png' -> '2880'."""
     parts = Path(image_relpath).parts
+    if len(parts) < 3:
+        raise ValueError(f"unexpected CelebA-Spoof image path shape: {image_relpath!r} "
+                         "(expected Data/<split>/<subject>/...)")
     return parts[2]
 
 
@@ -46,7 +50,12 @@ def _read_labels(src: Path, splits: tuple[str, ...]) -> dict[str, int]:
     for sp in splits:
         lf = src / "metas" / "intra_test" / f"{sp}_label.json"
         if lf.exists():
-            for relpath, labels in json.loads(lf.read_text()).items():
+            data = json.loads(lf.read_text())
+            if not isinstance(data, dict):
+                raise ValueError(f"{lf}: expected a JSON object {{relpath: [labels]}}, got {type(data).__name__}")
+            for relpath, labels in data.items():
+                if len(labels) <= SPOOF_TYPE_INDEX:
+                    raise ValueError(f"{lf}: annotation for {relpath!r} has {len(labels)} entries, need > {SPOOF_TYPE_INDEX}")
                 codes[relpath] = int(labels[SPOOF_TYPE_INDEX])
             continue
         txt = src / "metas" / "intra_test" / f"{sp}_label.txt"
@@ -91,7 +100,8 @@ def stage_celeba_spoof(
         else:
             dst = staging / "attack" / cls / subj / name
         dst.parent.mkdir(parents=True, exist_ok=True)
-        if not dst.exists():
-            dst.symlink_to((src / relpath).resolve())
+        target = os.path.relpath((src / relpath).resolve(), dst.parent.resolve())
+        if not (dst.exists() or dst.is_symlink()):
+            dst.symlink_to(target)
         counts[cls] += 1
     return counts

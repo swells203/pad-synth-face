@@ -79,3 +79,35 @@ def test_stage_max_subjects_caps(tmp_path):
     assert counts["n_subjects"] == 1
     assert (staging / "bonafide" / "subjA").is_dir()
     assert not (staging / "attack" / "replay" / "subjB").exists()
+
+
+def test_stage_reads_txt_label_fallback(tmp_path):
+    # No JSON label file -> the .txt fallback (relpath <43 space-separated ints>).
+    src = tmp_path / "celeba"
+    rng = np.random.default_rng(2)
+    def _img(relpath):
+        p = src / relpath
+        p.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(rng.integers(0, 256, (80, 80, 3), dtype=np.uint8)).save(p)
+    _img("Data/train/subjX/live/0.jpg")
+    _img("Data/train/subjX/spoof/1.jpg")
+    meta = src / "metas" / "intra_test"
+    meta.mkdir(parents=True, exist_ok=True)
+    def _line(relpath, code):
+        labels = [0] * 43
+        labels[SPOOF_TYPE_INDEX] = code
+        return relpath + " " + " ".join(str(x) for x in labels)
+    (meta / "train_label.txt").write_text(
+        _line("Data/train/subjX/live/0.jpg", 0) + "\n"
+        + _line("Data/train/subjX/spoof/1.jpg", 1) + "\n")
+    counts = stage_celeba_spoof(src, tmp_path / "staging", splits=("train",))
+    assert counts["bonafide"] == 1 and counts["print"] == 1
+
+
+def test_stage_is_idempotent_on_rerun(tmp_path):
+    src = _build_celeba_fixture(tmp_path / "celeba")
+    staging = tmp_path / "staging"
+    c1 = stage_celeba_spoof(src, staging, splits=("train",))
+    c2 = stage_celeba_spoof(src, staging, splits=("train",))  # must not raise
+    assert c1 == c2
+    assert (staging / "bonafide" / "subjA" / "0.jpg").is_symlink()
