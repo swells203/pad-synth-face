@@ -717,6 +717,12 @@ a conclusion. **Implication:** the synthetic *mask* and *replay* attack physics 
 where the gap is widest — the place attack-physics work (or real data) would pay
 off most. Confirm/kill on the CelebA-Spoof run, which has far more mask/replay.
 
+A same-source quartet (one DigiFace face through each generator) shows the why
+visually — print has a strong halftone signature, replay a subtle bezel/skew,
+mask a soft haloed blur that doesn't read as a rigid silicone/3D mask:
+
+![Synthetic attack quartet: bonafide → print → replay → mask](../../figures/attack-quartet.png)
+
 ## 2026-06-04 update — B1 PULSE on AxonData n=55 (weak/confounded; NOT a verdict)
 
 A quick B1 finetune-curve on the existing n=55 AxonData pilot — to pulse-check
