@@ -111,3 +111,32 @@ def test_stage_is_idempotent_on_rerun(tmp_path):
     c2 = stage_celeba_spoof(src, staging, splits=("train",))  # must not raise
     assert c1 == c2
     assert (staging / "bonafide" / "subjA" / "0.jpg").is_symlink()
+
+
+def test_end_to_end_stage_then_ingest_person_ids(tmp_path):
+    """stage -> ingest_real_attack(subject_id_fn) -> canonical dataset whose
+    manifest carries person ids (not file paths)."""
+    from pad_synth_face.real_attack import ingest_real_attack
+
+    src = _build_celeba_fixture(tmp_path / "celeba")
+    staging = tmp_path / "staging"
+    out = tmp_path / "out"
+    stage_celeba_spoof(src, staging, splits=("train",))
+
+    def subject_id_fn(fp: Path) -> str:
+        parts = fp.relative_to(staging).parts
+        return parts[1] if parts[0] == "bonafide" else parts[2]
+
+    summary = ingest_real_attack(
+        src=staging, out=out, dataset_name="CelebA-Spoof",
+        license="CelebA-Spoof non-commercial research",
+        source_url="https://github.com/ZhangYuanhan-AI/CelebA-Spoof",
+        subject_id_fn=subject_id_fn,
+    )
+    assert summary["counts"]["bonafide"] == 1
+    assert summary["counts"]["mask"] == 2
+    recs = [json.loads(l) for l in (out / "manifest.jsonl").read_text().splitlines()]
+    ids = {r["bonafide_source"]["id"] for r in recs}
+    # person ids, NOT file paths
+    assert ids == {"subjA", "subjB", "subjC", "subjD"}
+    assert all("/" not in i for i in ids)
