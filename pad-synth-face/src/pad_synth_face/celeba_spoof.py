@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 from pathlib import Path
 from typing import Any
 
@@ -73,15 +74,24 @@ def stage_celeba_spoof(
     staging: Path,
     max_subjects: int | None = None,
     splits: tuple[str, ...] = ("train", "test"),
+    seed: int = 0,
 ) -> dict[str, Any]:
     """Symlink CelebA-Spoof images into <staging>/bonafide/<subj>/ and
-    <staging>/attack/<type>/<subj>/, mapping spoof codes to our classes."""
+    <staging>/attack/<type>/<subj>/, mapping spoof codes to our classes.
+
+    When max_subjects caps the subset, subjects are selected by a SEEDED
+    SHUFFLE, not lexically: CelebA-Spoof subject IDs correlate with
+    attack-collection batches, so sorted()[:N] yields a badly skewed
+    attack-type mix (e.g. no replay / no codes 5,6). The shuffle makes the
+    capped subset representative; full-dataset (max_subjects=None) is unaffected.
+    """
     src, staging = Path(src), Path(staging)
     codes = _read_labels(src, splits)
 
     subjects = sorted({_subject_of(p) for p in codes})
     if max_subjects is not None:
-        subjects = subjects[:max_subjects]
+        random.Random(seed).shuffle(subjects)
+        subjects = sorted(subjects[:max_subjects])
     keep = set(subjects)
 
     counts = {"bonafide": 0, "print": 0, "replay": 0, "mask": 0,
