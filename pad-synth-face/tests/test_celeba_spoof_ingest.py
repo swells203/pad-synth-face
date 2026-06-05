@@ -75,10 +75,38 @@ def test_stage_max_subjects_caps(tmp_path):
     src = _build_celeba_fixture(tmp_path / "celeba")
     staging = tmp_path / "staging"
     counts = stage_celeba_spoof(src, staging, splits=("train",), max_subjects=1)
-    # only subjA (sorted-first) is staged
+    # exactly one subject staged (which one is seed-shuffle dependent, not lexical)
     assert counts["n_subjects"] == 1
-    assert (staging / "bonafide" / "subjA").is_dir()
-    assert not (staging / "attack" / "replay" / "subjB").exists()
+    staged = [p.name for p in (staging / "bonafide").iterdir()] if (staging / "bonafide").exists() else []
+    staged += [p.name for cls in (staging / "attack").iterdir() for p in cls.iterdir()] if (staging / "attack").exists() else []
+    assert len(set(staged)) == 1  # all staged images belong to a single subject
+
+
+def test_stage_max_subjects_is_representative_not_lexical(tmp_path):
+    """Regression: capping must sample subjects representatively. CelebA-Spoof
+    subject IDs correlate with attack type, so lexical sorted()[:N] yields a
+    skewed mix. The seeded shuffle must pull BOTH attack families when capping."""
+    src = tmp_path / "celeba"
+    rng = np.random.default_rng(0)
+    labels = {}
+    def _img(subj, kind, code, i):
+        rel = f"Data/train/{subj}/{kind}/{i}.jpg"
+        p = src / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(rng.integers(0, 256, (64, 64, 3), dtype=np.uint8)).save(p)
+        labels[rel] = _lbl(code)
+    # subjects 00..09 are PRINT-only (code 1); 10..19 are REPLAY-only (code 7).
+    for s in range(10):
+        _img(f"{s:02d}", "live", 0, 0); _img(f"{s:02d}", "spoof", 1, 1)        # print
+    for s in range(10, 20):
+        _img(f"{s:02d}", "live", 0, 0); _img(f"{s:02d}", "spoof", 7, 1)        # replay
+    (src / "metas" / "intra_test").mkdir(parents=True, exist_ok=True)
+    (src / "metas" / "intra_test" / "train_label.json").write_text(json.dumps(labels))
+    # Cap to 10 subjects: lexical-first would be 00..09 = all print, 0 replay.
+    counts = stage_celeba_spoof(src, tmp_path / "stg", splits=("train",),
+                                max_subjects=10, seed=0)
+    assert counts["n_subjects"] == 10
+    assert counts["print"] > 0 and counts["replay"] > 0  # representative, not all-print
 
 
 def test_stage_reads_txt_label_fallback(tmp_path):

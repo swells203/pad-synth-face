@@ -38,10 +38,13 @@ def main() -> None:
                     default="https://github.com/ZhangYuanhan-AI/CelebA-Spoof")
     ap.add_argument("--max-subjects", type=int, default=None)
     ap.add_argument("--max-per-class", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=0,
+                    help="Seed for the representative subject shuffle (when --max-subjects caps).")
     args = ap.parse_args()
 
     staging = args.staging
-    stage_summary = stage_celeba_spoof(args.src, staging, max_subjects=args.max_subjects)
+    stage_summary = stage_celeba_spoof(
+        args.src, staging, max_subjects=args.max_subjects, seed=args.seed)
 
     def subject_id_fn(fp: Path) -> str:
         parts = fp.relative_to(staging).parts
