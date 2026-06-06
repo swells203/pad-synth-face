@@ -1,0 +1,21 @@
+{
+  "n_real": 50,
+  "mode": "head",
+  "eer_in_domain": 0.47947454844006565,
+  "val_accuracy_in_domain": 0.62,
+  "n_train": 50,
+  "n_val_in_domain": 50,
+  "eer_cross_domain": 0.4823555178903117,
+  "val_accuracy_cross_domain": 0.5333074634588022,
+  "n_val_cross_domain": 7731,
+  "threshold": 1.9453709754202464e-08,
+  "target_apcer": 0.05,
+  "apcer_cross_domain": 0.021289537712895375,
+  "bpcer_cross_domain": 0.9920076726342711,
+  "acer_cross_domain": 0.5066486051735832,
+  "apcer_per_pai_cross_domain": {
+    "mask": 0.0,
+    "print": 0.0022818026240730175,
+    "replay": 0.021289537712895375
+  }
+}

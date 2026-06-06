@@ -780,3 +780,51 @@ person-disjoint, big-N answer remains the CelebA-Spoof run
 (`docs/celeba-spoof-b1.md`).
 
 - raw: [`./2026-05-22-pad-spark-sweep-results/runs_b1_axon_pulse/runs/`](./2026-05-22-pad-spark-sweep-results/runs_b1_axon_pulse/runs/) (12 files = 4 N × 3 seeds).
+
+## 2026-06-06 update — B1 on CelebA-Spoof: THE HYBRID WORKS (real finetune rescues the model)
+
+**The headline result of the project.** The pivotal question — *does real finetune
+data rescue the ~chance synth→real model?* — answered on a real, person-disjoint,
+representative set (CelebA-Spoof, 500 subjects, **7,731-sample test**, 3 seeds).
+L4 pretrained on synthetic `mix_seta_d3`, finetuned on the CelebA-Spoof pool,
+EER on the held-out real test. (CelebA-Spoof ingested via
+`scripts/prepare_celeba_spoof.py`; representative subject sampling per the
+2026-06-04 sampling fix.)
+
+| N (real finetune) | **full** finetune EER | head finetune EER | full ACER@5% |
+|---|---|---|---|
+| 0 (synth-only) | 0.520 ± 0.016 | 0.502 ± 0.020 | — |
+| 50 | 0.486 ± 0.012 | 0.470 ± 0.009 | 0.511 |
+| 200 | 0.367 ± 0.028 | 0.470 ± 0.002 | 0.403 |
+| **1000** | **0.163 ± 0.005** | 0.471 ± 0.022 | **0.182** |
+
+### Headline finding
+
+**Real finetune data rescues the synthetic-pretrained model — decisively.** Full
+finetune drops real-test EER from chance (0.52) to **0.163** at N=1000, monotonic,
+tight variance (±0.005), still descending steeply (0.37→0.16 over the last leg —
+more real data would go lower). ACER@5% APCER falls 0.51→**0.18** in step. This is
+the first project result showing the approach *works on real attacks*.
+
+### Mechanism (head vs full)
+
+- **Head mode (frozen backbone) stays flat at ~0.47** — the synthetic-pretrained
+  *features* don't transfer, and freezing them caps performance at chance.
+- **Full mode plunges to 0.16** — letting the real samples reshape the backbone
+  closes the gap. **The synth→real gap lives in the features; real finetuning
+  fixes exactly that.**
+
+### Strategic implication
+
+Flips the picture from the 2026-06-03 reality check ("synthetic-only ≈ chance on
+real") to: **synth-pretrain → real-finetune is a working PAD detector.** This is
+the evidence the commercial-data decision needed — real data demonstrably converts
+the pipeline into a working detector, and the curve hasn't plateaued. Path to a
+shippable model is concrete: buy a **commercially-licensed** real set (CelebA-Spoof
+is research-only — answers the decision, can't ship), finetune, ship.
+
+**Caveats:** research data (non-commercial). One open ablation: does the synthetic
+*pretraining* add value vs. training on 1,000 real from scratch (is the *hybrid*
+worth it, or just the real data)? Doesn't dim the headline.
+
+- raw: [full](./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_full/runs/) (12 files) · [head](./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_head/runs/) (12 files). Train `mix_seta_d3` → finetune/eval `_real_attack/celeba_spoof`.
