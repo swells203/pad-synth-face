@@ -1,0 +1,17 @@
+{
+  "n_real": 0,
+  "mode": "head",
+  "eer_in_domain": null,
+  "val_accuracy_in_domain": null,
+  "n_train": 0,
+  "n_val_in_domain": 0,
+  "eer_cross_domain": 0.5046730575411241,
+  "val_accuracy_cross_domain": 0.5914744752526562,
+  "n_val_cross_domain": 7718,
+  "threshold": null,
+  "target_apcer": 0.05,
+  "apcer_cross_domain": null,
+  "bpcer_cross_domain": null,
+  "acer_cross_domain": null,
+  "apcer_per_pai_cross_domain": null
+}

@@ -1,0 +1,32 @@
+{
+  "rows": [
+    {
+      "n_real": 0,
+      "eer": 0.47577515528268044,
+      "acer": null,
+      "skipped": false
+    },
+    {
+      "n_real": 50,
+      "eer": 0.4639699870807741,
+      "acer": 0.4890173985093703,
+      "skipped": false
+    },
+    {
+      "n_real": 200,
+      "eer": 0.4689588793392413,
+      "acer": 0.4961709471957236,
+      "skipped": false
+    },
+    {
+      "n_real": 1000,
+      "eer": 0.4685842432174064,
+      "acer": 0.5126246713632896,
+      "skipped": false
+    }
+  ],
+  "pool_size": 17905,
+  "n_test": 7798,
+  "mode": "head",
+  "seed": 2
+}
