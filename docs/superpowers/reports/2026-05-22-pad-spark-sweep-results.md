@@ -828,3 +828,50 @@ is research-only — answers the decision, can't ship), finetune, ship.
 worth it, or just the real data)? Doesn't dim the headline.
 
 - raw: [full](./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_full/runs/) (12 files) · [head](./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_head/runs/) (12 files). Train `mix_seta_d3` → finetune/eval `_real_attack/celeba_spoof`.
+
+## 2026-06-06 update (2) — ABLATION: synthetic pretraining is HARMFUL; ImageNet→real wins
+
+The hybrid-vs-from-scratch ablation, run immediately after the result above —
+same backbone/finetune/seeds/real data, the ONLY difference being whether the
+synthetic pretraining step happened (`--pretrain-epochs 0` = ImageNet init →
+finetune on real directly, skipping synth).
+
+| N (real finetune) | **ImageNet→real (no synth)** | hybrid (ImageNet→synth→real) |
+|---|---|---|
+| 0 | 0.510 ± 0.056 (ImageNet only, chance) | 0.520 |
+| 50 | **0.134 ± 0.017** | 0.486 |
+| 200 | **0.058 ± 0.004** | 0.367 |
+| 1000 | **0.039 ± 0.005** | 0.163 |
+
+### Headline finding (corrects the framing of update (1))
+
+**Synthetic pretraining is actively harmful, not just unhelpful.** Skipping it is
+~4× better at N=1000 (**0.039 vs 0.163**) and better at every N. Clean comparison
+(tight variance, identical except the synth step). Update (1)'s "the hybrid works"
+was right that *real finetune* rescues the model — but the *synthetic pretraining
+is the wrong way to use it*. **The strong configuration is ImageNet ResNet18 +
+finetune on real PAD data** (EER 0.039 @ N=1000; already 0.134 @ N=50, 0.058 @
+N=200). Likely mechanism: the synth step specialises the net to synthetic-specific
+features (e.g. the diagnosed "soft-blur dome = mask" artifact) that real finetuning
+must first unlearn; ImageNet's general features are a strictly better start.
+
+### Strategic implication
+
+The path to a shippable detector is **simpler, cheaper, and better** than the
+synthetic-first thesis assumed: an ImageNet backbone + a *modest* real PAD set
+(a few hundred labelled samples already gives a usable operating point). The
+~$10k commercial-data buy is even more justified — and you may need less data
+than feared. **The synthetic-generation pipeline does not earn its keep as a
+pretraining strategy.**
+
+### Caveats (what this does NOT kill)
+
+- **Cross-dataset generalisation untested:** CelebA-Spoof train→test (person-
+  disjoint, but same dataset). The real test is train-on-one-real-set →
+  eval-on-a-different-real-set; ImageNet→real may generalise less across datasets.
+- Synthetic data may still help in **roles not tested here**: as augmentation
+  *mixed with* real (not pretraining), for **zero-shot** to attack types absent
+  from the real set, or when real data is scarcer than N=50.
+- Research data (CelebA-Spoof) — confirm on commercial data before shipping.
+
+- raw: [`./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_noskip_imagenet/runs/`](./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_noskip_imagenet/runs/) (12 files).
