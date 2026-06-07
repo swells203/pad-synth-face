@@ -875,3 +875,55 @@ pretraining strategy.**
 - Research data (CelebA-Spoof) — confirm on commercial data before shipping.
 
 - raw: [`./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_noskip_imagenet/runs/`](./2026-05-22-pad-spark-sweep-results/runs_b1_celeba_noskip_imagenet/runs/) (12 files).
+
+## 2026-06-06 update (3) — CROSS-DATASET: the real bottom line (generalisation is the unsolved problem)
+
+The decisive generalisation test: ImageNet L4 trained on **real CelebA-Spoof**,
+evaluated on a **different** real dataset (AxonData) — `train_and_cross_domain_eval`,
+3 seeds.
+
+| Train → Eval | EER |
+|---|---|
+| real CelebA → real CelebA (in-dataset, person-disjoint) | 0.041 |
+| **real CelebA → real AxonData (cross-dataset)** | **0.406 ± 0.017** (ACER 0.51) |
+
+### Headline finding — the culminating result
+
+The model that scores **0.041 in-dataset collapses to 0.41 (chance) cross-dataset.**
+And real→AxonData (0.41) ≈ synthetic→AxonData (0.40): training on real data from one
+source generalises to a new real source **no better than synthetic did.** Putting
+the whole report together:
+
+| | EER |
+|---|---|
+| synth → synth (within synthetic) | 0.055 |
+| real → real (within CelebA) | 0.041 |
+| synth → real (AxonData) | 0.40 |
+| real → real (CelebA → AxonData) | 0.41 |
+
+**Every within-distribution number is ~0.04–0.06; every across-distribution number
+is ~chance — independent of synthetic vs real.** The binding problem was never
+synthetic-vs-real; it is **cross-domain generalisation**, the known central hard
+problem of face PAD. This corrects the framing of updates (1)/(2): the in-dataset
+0.039/0.041 are within-distribution mirrors; a deployed detector faces a *different*
+distribution, where performance is at chance.
+
+### Strategic implication (reframes the roadmap)
+
+1. No approach tested yields a cross-dataset-generalising detector.
+2. The real lever is **domain generalisation** — multi-source training, DG losses
+   (CORAL/MMD/SSDG/DANN), and/or test-time / per-deployment adaptation. (Resurrects
+   the old deprioritised Lever B as *the* central problem.)
+3. **The single-source ~$10k buy needs rethinking:** one commercial dataset →
+   great in-dataset numbers, likely still failing on the real deployment
+   distribution. What's needed: **diverse multi-source real data** covering
+   deployment conditions, DG methods, and/or **real data from the actual
+   deployment environment** for calibration.
+
+### Caveats
+
+AxonData eval is n=55 (noisy) — but 0.41 ± 0.017 is tight and independently matches
+the synth→AxonData 0.40, so the signal is robust. One cross-dataset pair; aligns
+with the PAD literature (cross-dataset is where PAD models notoriously break).
+
+- raw: [`./2026-05-22-pad-spark-sweep-results/runs_xdataset_celeba_to_axon_L4/runs/`](./2026-05-22-pad-spark-sweep-results/runs_xdataset_celeba_to_axon_L4/runs/) (3 files).
